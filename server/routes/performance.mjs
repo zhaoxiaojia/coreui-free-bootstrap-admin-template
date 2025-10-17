@@ -14,22 +14,22 @@ router.get('/', async (req, res, next) => {
 
   if (filters.deviceValue && !filters.deviceColumn) {
     return res.status(400).json({
-      error: 'deviceType 必须是 adb_device 或 telnet_ip 并且与 deviceValue 一起使用'
+      error: 'deviceType must be adb_device or telnet_ip and used together with deviceValue'
     })
   }
 
   if (filters.deviceTypeRaw && !allowedDeviceOptions.includes(filters.deviceTypeRaw)) {
     return res.status(400).json({
-      error: '不支持的 deviceType，允许值：adb_device 或 telnet_ip'
+      error: 'Unsupported deviceType. Allowed values: adb_device or telnet_ip'
     })
   }
 
   if (filters.startDate && !isValidDate(filters.startDate)) {
-    return res.status(400).json({ error: 'start 日期格式不正确' })
+    return res.status(400).json({ error: 'The start date format is invalid' })
   }
 
   if (filters.endDate && !isValidDate(filters.endDate)) {
-    return res.status(400).json({ error: 'end 日期格式不正确' })
+    return res.status(400).json({ error: 'The end date format is invalid' })
   }
 
   try {
