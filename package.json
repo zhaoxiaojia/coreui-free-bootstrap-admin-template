@@ -50,6 +50,7 @@
     }
   ],
   "scripts": {
+    "api": "node server/index.mjs",
     "build": "npm-run-all clean --parallel css js sync --sequential build-vendors",
     "build-vendors": "node build/vendors.mjs",
     "clean": "rimraf dist",
@@ -67,6 +68,7 @@
     "release-version": "node build/change-version.mjs",
     "serve": "serve dist",
     "start": "npm-run-all --sequential clean css js sync --parallel localhost watch",
+    "dev": "npm-run-all --parallel api start",
     "sync": "npm-run-all --parallel sync-*",
     "sync-assets": "syncdir src/assets dist/assets",
     "sync-views": "syncdir src/views dist",
@@ -86,7 +88,11 @@
     "@coreui/icons": "^3.0.1",
     "@coreui/utils": "^2.0.2",
     "chart.js": "^4.5.0",
-    "simplebar": "^6.3.2"
+    "cors": "^2.8.5",
+    "express": "^4.21.1",
+    "mysql2": "^3.11.3",
+    "simplebar": "^6.3.2",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@babel/cli": "^7.28.0",
