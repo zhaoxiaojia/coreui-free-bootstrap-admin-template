@@ -109,8 +109,6 @@
     summaryRow?.remove()
   }
 
-  const TOOLTIP_DISTANCE_THRESHOLD = 32
-
   const tooltipProximityPlugin = {
     id: 'tooltipProximity',
     afterEvent(chart, args) {
@@ -130,30 +128,28 @@
       }
 
       const tooltip = chart.tooltip
-      if (!tooltip || tooltip.getActiveElements().length === 0) {
+      if (!tooltip) {
         return
       }
+      const nativeEvent = event.native ?? event
 
       const getPosition = () => {
         if (typeof event.x === 'number' && typeof event.y === 'number') {
           return { x: event.x, y: event.y }
         }
 
-        if (event.native) {
-          const relative = Chart.helpers?.getRelativePosition?.(event.native, chart)
-          if (relative) {
-            return relative
-          }
+        const relative = Chart.helpers?.getRelativePosition?.(nativeEvent, chart)
+        if (relative) {
+          return relative
+        }
 
-          const { offsetX, offsetY, clientX, clientY, target } = event.native
-          if (typeof offsetX === 'number' && typeof offsetY === 'number') {
-            return { x: offsetX, y: offsetY }
-          }
+        if ('offsetX' in nativeEvent && 'offsetY' in nativeEvent && typeof nativeEvent.offsetX === 'number' && typeof nativeEvent.offsetY === 'number') {
+          return { x: nativeEvent.offsetX, y: nativeEvent.offsetY }
+        }
 
-          if (typeof clientX === 'number' && typeof clientY === 'number' && target?.getBoundingClientRect) {
-            const rect = target.getBoundingClientRect()
-            return { x: clientX - rect.left, y: clientY - rect.top }
-          }
+        if (typeof nativeEvent.clientX === 'number' && typeof nativeEvent.clientY === 'number' && nativeEvent.target?.getBoundingClientRect) {
+          const rect = nativeEvent.target.getBoundingClientRect()
+          return { x: nativeEvent.clientX - rect.left, y: nativeEvent.clientY - rect.top }
         }
 
         return null
@@ -161,10 +157,12 @@
 
       const position = getPosition()
       if (!position) {
+        tooltip.setActiveElements([], { x: 0, y: 0 })
+        chart.update('none')
         return
       }
 
-      const nearest = chart.getElementsAtEventForMode(event.native ?? event, 'nearest', { intersect: false }, true)
+      const nearest = chart.getElementsAtEventForMode(nativeEvent, 'nearest', { intersect: true }, true)
       if (!nearest.length) {
         tooltip.setActiveElements([], { x: 0, y: 0 })
         chart.update('none')
@@ -179,8 +177,23 @@
       }
 
       const distance = Math.hypot(position.x - element.x, position.y - element.y)
-      if (distance > TOOLTIP_DISTANCE_THRESHOLD) {
+      const radius = element.options?.hitRadius ?? element.options?.radius ?? 0
+
+      if (!Number.isFinite(radius) || distance > radius) {
         tooltip.setActiveElements([], { x: 0, y: 0 })
+        chart.update('none')
+        return
+      }
+
+      const { datasetIndex, index } = nearest[0]
+      const activeElements = tooltip.getActiveElements()
+      const alreadyActive =
+        activeElements.length === 1 &&
+        activeElements[0].datasetIndex === datasetIndex &&
+        activeElements[0].index === index
+
+      if (!alreadyActive) {
+        tooltip.setActiveElements([{ datasetIndex, index }], { x: element.x, y: element.y })
         chart.update('none')
       }
     }
@@ -499,7 +512,7 @@
         parsing: false,
         interaction: {
           mode: 'nearest',
-          intersect: false
+          intersect: true
         },
         plugins: {
           legend: {
@@ -513,7 +526,7 @@
           tooltip: {
             mode: 'nearest',
             position: 'nearest',
-            intersect: false,
+            intersect: true,
             external: coreui.ChartJS.customTooltips,
             callbacks: {
               title: items => {
