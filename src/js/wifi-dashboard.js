@@ -72,24 +72,118 @@
 
 
   const formatBand = value => {
-    const text = ${value ?? ''}.trim()
-    if (!text) {
+    const raw = `${value ?? ''}`.trim()
+    if (!raw) {
       return ''
     }
 
-    let normalized = text.replace(/band\s*/i, '').replace(/\s+/g, '')
+    let normalized = raw.replace(/band\s*/i, '').replace(/\s+/g, '')
     if (!normalized) {
-      normalized = text.replace(/\s+/g, '')
+      normalized = raw.replace(/\s+/g, '')
     }
 
     normalized = normalized.replace(/ghz$/i, '')
     normalized = normalized.replace(/g$/i, '')
 
     if (!normalized) {
-      return text
+      return raw.replace(/\s+/g, '')
     }
 
-    return ${normalized}G
+    const numeric = Number.parseFloat(normalized)
+    if (Number.isFinite(numeric)) {
+      const trimmed = Number(numeric.toFixed(2))
+      return `${trimmed}G`
+    }
+
+    return `${normalized}G`
+  }
+
+  const removeSummaryRowIfPresent = () => {
+    const summaryLabels = ['数据点数量', '平均吞吐']
+    const rows = Array.from(document.querySelectorAll('.row'))
+    const summaryRow = rows.find(row => {
+      const text = row.textContent?.replace(/\s+/g, '') ?? ''
+      return summaryLabels.every(label => text.includes(label))
+    })
+
+    summaryRow?.remove()
+  }
+
+  const TOOLTIP_DISTANCE_THRESHOLD = 32
+
+  const tooltipProximityPlugin = {
+    id: 'tooltipProximity',
+    afterEvent(chart, args) {
+      const { event, inChartArea } = args
+      if (!event) {
+        return
+      }
+
+      if (event.type === 'mouseout' || !inChartArea) {
+        chart.tooltip?.setActiveElements([], { x: 0, y: 0 })
+        chart.update('none')
+        return
+      }
+
+      if (event.type !== 'mousemove') {
+        return
+      }
+
+      const tooltip = chart.tooltip
+      if (!tooltip || tooltip.getActiveElements().length === 0) {
+        return
+      }
+
+      const getPosition = () => {
+        if (typeof event.x === 'number' && typeof event.y === 'number') {
+          return { x: event.x, y: event.y }
+        }
+
+        if (event.native) {
+          const relative = Chart.helpers?.getRelativePosition?.(event.native, chart)
+          if (relative) {
+            return relative
+          }
+
+          const { offsetX, offsetY, clientX, clientY, target } = event.native
+          if (typeof offsetX === 'number' && typeof offsetY === 'number') {
+            return { x: offsetX, y: offsetY }
+          }
+
+          if (typeof clientX === 'number' && typeof clientY === 'number' && target?.getBoundingClientRect) {
+            const rect = target.getBoundingClientRect()
+            return { x: clientX - rect.left, y: clientY - rect.top }
+          }
+        }
+
+        return null
+      }
+
+      const position = getPosition()
+      if (!position) {
+        return
+      }
+
+      const nearest = chart.getElementsAtEventForMode(event.native ?? event, 'nearest', { intersect: false }, true)
+      if (!nearest.length) {
+        tooltip.setActiveElements([], { x: 0, y: 0 })
+        chart.update('none')
+        return
+      }
+
+      const { element } = nearest[0]
+      if (!element) {
+        tooltip.setActiveElements([], { x: 0, y: 0 })
+        chart.update('none')
+        return
+      }
+
+      const distance = Math.hypot(position.x - element.x, position.y - element.y)
+      if (distance > TOOLTIP_DISTANCE_THRESHOLD) {
+        tooltip.setActiveElements([], { x: 0, y: 0 })
+        chart.update('none')
+      }
+    }
   }
 
   const setStatus = message => {
@@ -158,6 +252,7 @@
     if (item.testReportId) {
       parts.push(`报告 ${item.testReportId}`)
     }
+
     if (item.casePath) {
       const segments = `${item.casePath}`.split(/[\\/]/).filter(Boolean)
       parts.push(segments.pop() ?? item.casePath)
@@ -165,16 +260,23 @@
       if (item.testCategory) {
         parts.push(item.testCategory)
       }
+
       if (item.band) {
-        parts.push(`Band ${item.band}`)
+        const bandLabel = formatBand(item.band) || item.band
+        if (bandLabel) {
+          parts.push(`Band ${bandLabel}`)
+        }
       }
+
       if (Number.isFinite(item.bandwidthMhz)) {
         parts.push(`${item.bandwidthMhz}MHz`)
       }
+
       const channel = deriveChannelFromFrequency(item.centerFreqMhz)
       if (channel !== null) {
         parts.push(`CH ${channel}`)
       }
+
       if (item.protocol) {
         parts.push(item.protocol.toUpperCase())
       }
@@ -427,7 +529,7 @@
                 const lines = [
                   `吞吐：${formatNumber(raw?.y)} Mbps`,
                   raw?.directionLabel ? `方向：${raw.directionLabel}` : null,
-                  raw?.band ? `频段：${raw.band}` : null,
+                  raw?.band ? `频段：${formatBand(raw.band) || raw.band}` : null,
                   Number.isFinite(raw?.bandwidthMhz) ? `带宽：${raw.bandwidthMhz} MHz` : null,
                   raw?.channel !== null && raw?.channel !== undefined ? `信道：${raw.channel}` : null,
                   Number.isFinite(raw?.centerFreqMhz) ? `中心频率：${formatNumber(raw.centerFreqMhz, 0)} MHz` : null,
@@ -470,7 +572,8 @@
             }
           }
         }
-      }
+      },
+      plugins: [tooltipProximityPlugin]
     })
 
     canvas.addEventListener('mouseleave', () => {
@@ -499,6 +602,7 @@
 
       const points = group.points.map(point => ({
         ...point,
+        band: formatBand(point.band) || point.band,
         scenarioLabel: group.label,
         directionLabel
       }))
@@ -616,7 +720,13 @@
         populateSelect(productLineSelect, filterOptions.productLines, '全部产品线')
         populateSelect(projectSelect, filterOptions.projects, '全部项目')
         populateSelect(standardSelect, filterOptions.standards, '全部模式')
-        populateSelect(bandSelect, filterOptions.bands, '全部频段')
+        populateSelect(
+          bandSelect,
+          filterOptions.bands,
+          '全部频段',
+          undefined,
+          value => formatBand(value) || value
+        )
         populateBandwidthSelect(filterOptions.bandwidths ?? [], '全部带宽')
         refreshDeviceValueOptions(filterOptions.devices ?? {})
         isSyncingFilters = false
@@ -683,6 +793,7 @@
   }
 
   const init = () => {
+    removeSummaryRowIfPresent()
     if (!form) {
       console.warn('未找到筛选表单，wifi-dashboard.js 未初始化。')
       return
