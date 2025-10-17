@@ -342,33 +342,34 @@
             <div class="col-12 col-xxl-4">
               <div class="card h-100">
                 <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-                  <h5 class="mb-0">Wi-Fi 鎬ц兘绛涢€?          .d-flex.flex-wrap.gap-2
+                  <h5 class="mb-0">Wi-Fi Performance Dashboard</h5>
+                  <div class="d-flex flex-wrap gap-2">
                     <button class="btn btn-outline-secondary btn-sm" id="refreshButton" type="button">
                       <svg class="icon me-1">
                         <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-reload"></use>
-                      </svg>鍒锋柊
+                      </svg>Refresh
                     </button>
                     <button class="btn btn-outline-primary btn-sm" id="exportButton" type="button">
                       <svg class="icon me-1">
                         <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-cloud-download"></use>
-                      </svg>瀵煎嚭
+                      </svg>Export
                     </button>
-                  </h5>
+                  </div>
                 </div>
                 <div class="card-body">
                   <div class="d-flex flex-column gap-4">
                     <div>
-                      <h6 class="fw-semibold mb-3">Tx（Uplink）</h6>
+                      <h6 class="fw-semibold mb-3">Tx (Uplink)</h6>
                       <div class="chart-container position-relative" style="min-height: 320px;">
                         <canvas id="performanceChartTx" style="min-height: 320px; width: 100%;"></canvas>
-                        <div class="text-body-secondary fw-semibold position-absolute top-50 start-50 translate-middle text-center p-3 rounded bg-body bg-opacity-75" id="chartEmptyStateTx" style="display: none;">Tx 方向暂无数据，请调整筛选条件后重试。</div>
+                        <div class="text-body-secondary fw-semibold position-absolute top-50 start-50 translate-middle text-center p-3 rounded bg-body bg-opacity-75" id="chartEmptyStateTx" style="display: none;">No Tx data available. Adjust the filters and try again.</div>
                       </div>
                     </div>
                     <div>
-                      <h6 class="fw-semibold mb-3">Rx（Downlink）</h6>
+                      <h6 class="fw-semibold mb-3">Rx (Downlink)</h6>
                       <div class="chart-container position-relative" style="min-height: 320px;">
                         <canvas id="performanceChartRx" style="min-height: 320px; width: 100%;"></canvas>
-                        <div class="text-body-secondary fw-semibold position-absolute top-50 start-50 translate-middle text-center p-3 rounded bg-body bg-opacity-75" id="chartEmptyStateRx" style="display: none;">Rx 方向暂无数据，请调整筛选条件后重试。</div>
+                        <div class="text-body-secondary fw-semibold position-absolute top-50 start-50 translate-middle text-center p-3 rounded bg-body bg-opacity-75" id="chartEmptyStateRx" style="display: none;">No Rx data available. Adjust the filters and try again.</div>
                       </div>
                     </div>
                   </div>

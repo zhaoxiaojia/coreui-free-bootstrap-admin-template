@@ -1,4 +1,4 @@
-﻿extends ../_layout/default.pug
+extends ../_layout/default.pug
 
 block styles
   link(rel='stylesheet', href='node_modules/@coreui/chartjs/dist/css/coreui-chartjs.css')
@@ -23,26 +23,27 @@ block view
     .col-12.col-xxl-4
       .card.h-100
         .card-header.d-flex.flex-wrap.align-items-center.justify-content-between.gap-2
-          h5.mb-0 Wi-Fi 鎬ц兘绛涢€?          .d-flex.flex-wrap.gap-2
+          h5.mb-0 Wi-Fi Performance Dashboard
+          .d-flex.flex-wrap.gap-2
             button#refreshButton.btn.btn-outline-secondary.btn-sm(type='button')
               svg.icon.me-1
                 use(xlink:href='node_modules/@coreui/icons/sprites/free.svg#cil-reload')
-              | 鍒锋柊
+              | Refresh
             button#exportButton.btn.btn-outline-primary.btn-sm(type='button')
               svg.icon.me-1
                 use(xlink:href='node_modules/@coreui/icons/sprites/free.svg#cil-cloud-download')
-              | 瀵煎嚭
+              | Export
         .card-body
           .d-flex.flex-column.gap-4
             div
-              h6.fw-semibold.mb-3 Tx（Uplink）
+              h6.fw-semibold.mb-3 Tx (Uplink)
               .chart-container.position-relative(style='min-height: 320px;')
                 canvas#performanceChartTx(style='min-height: 320px; width: 100%;')
                 .text-body-secondary.fw-semibold.position-absolute.top-50.start-50.translate-middle.text-center.p-3.rounded.bg-body.bg-opacity-75#chartEmptyStateTx(style='display: none;')
-                  | Tx 方向暂无数据，请调整筛选条件后重试。
+                  | No Tx data available. Adjust the filters and try again.
             div
-              h6.fw-semibold.mb-3 Rx（Downlink）
+              h6.fw-semibold.mb-3 Rx (Downlink)
               .chart-container.position-relative(style='min-height: 320px;')
                 canvas#performanceChartRx(style='min-height: 320px; width: 100%;')
                 .text-body-secondary.fw-semibold.position-absolute.top-50.start-50.translate-middle.text-center.p-3.rounded.bg-body.bg-opacity-75#chartEmptyStateRx(style='display: none;')
-                  | Rx 方向暂无数据，请调整筛选条件后重试。
+                  | No Rx data available. Adjust the filters and try again.

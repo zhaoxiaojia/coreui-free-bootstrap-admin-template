@@ -1,17 +1,17 @@
-﻿/* global Chart, coreui, XLSX */
+/* global Chart, coreui, XLSX */
 
 /**
- * Wi-Fi 性能仪表盘脚本
- * - 加载筛选项
- * - 根据条件检索性能数据
- * - 绘制 Path Loss (dB) vs Throughput (Mbps) 折线图
- * - 支持导出 Excel
+ * Wi-Fi performance dashboard script
+ * - load filter options
+ * - fetch performance data with the active filters
+ * - draw the Path Loss (dB) vs Throughput (Mbps) line charts
+ * - support Excel export
  */
 
 (() => {
   const API_BASE = window.WIFI_DASHBOARD_API_BASE ?? 'http://localhost:5000/api'
   const DEFAULT_LIMIT = Number.parseInt(window.WIFI_DASHBOARD_MAX_POINTS ?? '1000', 10)
-  const FILTER_PROMPT_MESSAGE = '请选择过滤条件后点击“应用过滤”按钮执行检索。'
+  const FILTER_PROMPT_MESSAGE = 'Select filters and click "Apply Filters" to retrieve data.'
 
   const form = document.getElementById('filtersForm')
   const productLineSelect = document.getElementById('filterProductLine')
@@ -28,12 +28,12 @@
   const exportButton = document.getElementById('exportButton')
   const DIRECTION_SETTINGS = {
     uplink: {
-      label: 'Tx（Uplink）',
+      label: 'Tx (Uplink)',
       canvasId: 'performanceChartTx',
       emptyStateId: 'chartEmptyStateTx'
     },
     downlink: {
-      label: 'Rx（Downlink）',
+      label: 'Rx (Downlink)',
       canvasId: 'performanceChartRx',
       emptyStateId: 'chartEmptyStateRx'
     }
@@ -72,24 +72,118 @@
 
 
   const formatBand = value => {
-    const text = ${value ?? ''}.trim()
-    if (!text) {
+    const raw = `${value ?? ''}`.trim()
+    if (!raw) {
       return ''
     }
 
-    let normalized = text.replace(/band\s*/i, '').replace(/\s+/g, '')
+    let normalized = raw.replace(/band\s*/i, '').replace(/\s+/g, '')
     if (!normalized) {
-      normalized = text.replace(/\s+/g, '')
+      normalized = raw.replace(/\s+/g, '')
     }
 
     normalized = normalized.replace(/ghz$/i, '')
     normalized = normalized.replace(/g$/i, '')
 
     if (!normalized) {
-      return text
+      return raw.replace(/\s+/g, '')
     }
 
-    return ${normalized}G
+    const numeric = Number.parseFloat(normalized)
+    if (Number.isFinite(numeric)) {
+      const trimmed = Number(numeric.toFixed(2))
+      return `${trimmed}G`
+    }
+
+    return `${normalized}G`
+  }
+
+  const removeSummaryRowIfPresent = () => {
+    const summaryLabels = ['Data Point Count', 'Average Throughput']
+    const rows = Array.from(document.querySelectorAll('.row'))
+    const summaryRow = rows.find(row => {
+      const text = row.textContent?.replace(/\s+/g, '').toLowerCase() ?? ''
+      return summaryLabels.every(label => text.includes(label.replace(/\s+/g, '').toLowerCase()))
+    })
+
+    summaryRow?.remove()
+  }
+
+  const TOOLTIP_DISTANCE_THRESHOLD = 32
+
+  const tooltipProximityPlugin = {
+    id: 'tooltipProximity',
+    afterEvent(chart, args) {
+      const { event, inChartArea } = args
+      if (!event) {
+        return
+      }
+
+      if (event.type === 'mouseout' || !inChartArea) {
+        chart.tooltip?.setActiveElements([], { x: 0, y: 0 })
+        chart.update('none')
+        return
+      }
+
+      if (event.type !== 'mousemove') {
+        return
+      }
+
+      const tooltip = chart.tooltip
+      if (!tooltip || tooltip.getActiveElements().length === 0) {
+        return
+      }
+
+      const getPosition = () => {
+        if (typeof event.x === 'number' && typeof event.y === 'number') {
+          return { x: event.x, y: event.y }
+        }
+
+        if (event.native) {
+          const relative = Chart.helpers?.getRelativePosition?.(event.native, chart)
+          if (relative) {
+            return relative
+          }
+
+          const { offsetX, offsetY, clientX, clientY, target } = event.native
+          if (typeof offsetX === 'number' && typeof offsetY === 'number') {
+            return { x: offsetX, y: offsetY }
+          }
+
+          if (typeof clientX === 'number' && typeof clientY === 'number' && target?.getBoundingClientRect) {
+            const rect = target.getBoundingClientRect()
+            return { x: clientX - rect.left, y: clientY - rect.top }
+          }
+        }
+
+        return null
+      }
+
+      const position = getPosition()
+      if (!position) {
+        return
+      }
+
+      const nearest = chart.getElementsAtEventForMode(event.native ?? event, 'nearest', { intersect: false }, true)
+      if (!nearest.length) {
+        tooltip.setActiveElements([], { x: 0, y: 0 })
+        chart.update('none')
+        return
+      }
+
+      const { element } = nearest[0]
+      if (!element) {
+        tooltip.setActiveElements([], { x: 0, y: 0 })
+        chart.update('none')
+        return
+      }
+
+      const distance = Math.hypot(position.x - element.x, position.y - element.y)
+      if (distance > TOOLTIP_DISTANCE_THRESHOLD) {
+        tooltip.setActiveElements([], { x: 0, y: 0 })
+        chart.update('none')
+      }
+    }
   }
 
   const setStatus = message => {
@@ -156,8 +250,9 @@
   const buildDatasetLabel = item => {
     const parts = []
     if (item.testReportId) {
-      parts.push(`报告 ${item.testReportId}`)
+      parts.push(`Report ${item.testReportId}`)
     }
+
     if (item.casePath) {
       const segments = `${item.casePath}`.split(/[\\/]/).filter(Boolean)
       parts.push(segments.pop() ?? item.casePath)
@@ -165,22 +260,29 @@
       if (item.testCategory) {
         parts.push(item.testCategory)
       }
+
       if (item.band) {
-        parts.push(`Band ${item.band}`)
+        const bandLabel = formatBand(item.band) || item.band
+        if (bandLabel) {
+          parts.push(`Band ${bandLabel}`)
+        }
       }
+
       if (Number.isFinite(item.bandwidthMhz)) {
         parts.push(`${item.bandwidthMhz}MHz`)
       }
+
       const channel = deriveChannelFromFrequency(item.centerFreqMhz)
       if (channel !== null) {
         parts.push(`CH ${channel}`)
       }
+
       if (item.protocol) {
         parts.push(item.protocol.toUpperCase())
       }
     }
 
-    return parts.length > 0 ? parts.join(' · ') : '未知测试'
+    return parts.length > 0 ? parts.join(' · ') : 'Unknown Test'
   }
 
   const COLOR_TOKEN_SETS = [
@@ -294,7 +396,7 @@
     populateSelect(
       deviceValueSelect,
       options,
-      deviceType === '' ? '请选择设备字段' : '全部设备',
+      deviceType === '' ? 'Select device field' : 'All devices',
       deviceValueSelect.value
     )
     if (deviceType === '') {
@@ -308,7 +410,7 @@
     const endpoint = queryString ? `${API_BASE}/filters?${queryString}` : `${API_BASE}/filters`
     const response = await fetch(endpoint)
     if (!response.ok) {
-      throw new Error('获取筛选项失败')
+      throw new Error('Failed to fetch filter options')
     }
     return response.json()
   }
@@ -320,7 +422,7 @@
     const response = await fetch(endpoint)
     if (!response.ok) {
       const message = await response.text()
-      throw new Error(message || '获取性能数据失败')
+      throw new Error(message || 'Failed to fetch performance data')
     }
     return response.json()
   }
@@ -385,7 +487,7 @@
     const config = DIRECTION_SETTINGS[direction]
     const canvas = document.getElementById(config.canvasId)
     if (!canvas) {
-      console.warn(`未找到画布元素 ${config.canvasId}，无法初始化图表`)
+      console.warn(`Canvas element ${config.canvasId} not found; unable to initialize chart`)
       return null
     }
 
@@ -419,23 +521,23 @@
                   return ''
                 }
                 const { raw } = items[0]
-                const scenario = raw?.scenarioLabel ?? '场景'
-                return [`${scenario}`, `Path Loss：${formatNumber(raw?.x)} dB`]
+                const scenario = raw?.scenarioLabel ?? 'Scenario'
+                return [`${scenario}`, `Path Loss: ${formatNumber(raw?.x)} dB`]
               },
               label: context => {
                 const { raw } = context
                 const lines = [
-                  `吞吐：${formatNumber(raw?.y)} Mbps`,
-                  raw?.directionLabel ? `方向：${raw.directionLabel}` : null,
-                  raw?.band ? `频段：${raw.band}` : null,
-                  Number.isFinite(raw?.bandwidthMhz) ? `带宽：${raw.bandwidthMhz} MHz` : null,
-                  raw?.channel !== null && raw?.channel !== undefined ? `信道：${raw.channel}` : null,
-                  Number.isFinite(raw?.centerFreqMhz) ? `中心频率：${formatNumber(raw.centerFreqMhz, 0)} MHz` : null,
-                  raw?.standard ? `模式：${raw.standard}` : null,
-                  raw?.protocol ? `协议：${raw.protocol}` : null,
-                  raw?.testCategory ? `场景类型：${raw.testCategory}` : null,
-                  raw?.casePath ? `Case：${raw.casePath}` : null,
-                  raw?.createdAt ? `时间：${formatDateTime(raw.createdAt)}` : null
+                  `Throughput: ${formatNumber(raw?.y)} Mbps`,
+                  raw?.directionLabel ? `Direction: ${raw.directionLabel}` : null,
+                  raw?.band ? `Band: ${formatBand(raw.band) || raw.band}` : null,
+                  Number.isFinite(raw?.bandwidthMhz) ? `Bandwidth: ${raw.bandwidthMhz} MHz` : null,
+                  raw?.channel !== null && raw?.channel !== undefined ? `Channel: ${raw.channel}` : null,
+                  Number.isFinite(raw?.centerFreqMhz) ? `Center Frequency: ${formatNumber(raw.centerFreqMhz, 0)} MHz` : null,
+                  raw?.standard ? `Standard: ${raw.standard}` : null,
+                  raw?.protocol ? `Protocol: ${raw.protocol}` : null,
+                  raw?.testCategory ? `Test Category: ${raw.testCategory}` : null,
+                  raw?.casePath ? `Case: ${raw.casePath}` : null,
+                  raw?.createdAt ? `Timestamp: ${formatDateTime(raw.createdAt)}` : null
                 ]
                 return lines.filter(Boolean)
               }
@@ -470,7 +572,8 @@
             }
           }
         }
-      }
+      },
+      plugins: [tooltipProximityPlugin]
     })
 
     canvas.addEventListener('mouseleave', () => {
@@ -499,6 +602,7 @@
 
       const points = group.points.map(point => ({
         ...point,
+        band: formatBand(point.band) || point.band,
         scenarioLabel: group.label,
         directionLabel
       }))
@@ -557,7 +661,7 @@
 
   const exportToExcel = () => {
     if (!latestDataset || latestDataset.length === 0) {
-      window.alert('当前没有可导出的数据，请先获取数据。')
+      window.alert('No data available to export. Please fetch data first.')
       return
     }
 
@@ -573,7 +677,7 @@
     }
 
     const sheetData = latestDataset.map((row, index) => ({
-      序号: index + 1,
+      Index: index + 1,
       Path_Loss_dB: row.pathLossDb,
       Throughput_Avg_Mbps: row.throughputAvgMbps,
       Direction: formatDirectionLabel(row.direction),
@@ -604,7 +708,7 @@
       return
     }
 
-    const loadingMessage = refreshData ? '正在加载数据，请稍候...' : '正在更新筛选项...'
+    const loadingMessage = refreshData ? 'Loading data, please wait...' : 'Refreshing filter options...'
     setLoadingState(true, loadingMessage)
 
     try {
@@ -613,11 +717,17 @@
         cachedFilterOptions = filterOptions
 
         isSyncingFilters = true
-        populateSelect(productLineSelect, filterOptions.productLines, '全部产品线')
-        populateSelect(projectSelect, filterOptions.projects, '全部项目')
-        populateSelect(standardSelect, filterOptions.standards, '全部模式')
-        populateSelect(bandSelect, filterOptions.bands, '全部频段')
-        populateBandwidthSelect(filterOptions.bandwidths ?? [], '全部带宽')
+        populateSelect(productLineSelect, filterOptions.productLines, 'All product lines')
+        populateSelect(projectSelect, filterOptions.projects, 'All projects')
+        populateSelect(standardSelect, filterOptions.standards, 'All standards')
+        populateSelect(
+          bandSelect,
+          filterOptions.bands,
+          'All bands',
+          undefined,
+          value => formatBand(value) || value
+        )
+        populateBandwidthSelect(filterOptions.bandwidths ?? [], 'All bandwidths')
         refreshDeviceValueOptions(filterOptions.devices ?? {})
         isSyncingFilters = false
       }
@@ -628,12 +738,12 @@
         updateCharts(data)
 
         if (data.length === 0) {
-          setStatus('没有找到符合条件的数据。')
+          setStatus('No data matched the selected filters.')
         } else if (metadata?.truncated) {
           const appliedLimit = metadata.appliedLimit ?? DEFAULT_LIMIT
-          setStatus(`已加载 ${data.length} 条数据（超过 ${appliedLimit} 条，已截断显示）。`)
+          setStatus(`Loaded ${data.length} records (exceeded ${appliedLimit}, results truncated.)`)
         } else {
-          setStatus(`成功加载 ${data.length} 条数据。`)
+          setStatus(`Successfully loaded ${data.length} records.`)
         }
       } else if (initial) {
         latestDataset = []
@@ -644,7 +754,7 @@
       }
     } catch (error) {
       console.error(error)
-      setStatus(error.message ?? '加载数据时出错，请稍后再试。')
+      setStatus(error.message ?? 'An error occurred while loading data. Please try again later.')
       if (refreshData) {
         updateCharts([])
         latestDataset = []
@@ -670,7 +780,7 @@
     loadFiltersAndData({
       refreshFilters: true,
       refreshData: false,
-      statusMessage: '设备列表已更新，请继续选择后应用过滤。'
+      statusMessage: 'Device list updated. Select a value and apply filters.'
     })
   }
 
@@ -683,8 +793,9 @@
   }
 
   const init = () => {
+    removeSummaryRowIfPresent()
     if (!form) {
-      console.warn('未找到筛选表单，wifi-dashboard.js 未初始化。')
+      console.warn('Filter form not found; wifi-dashboard.js did not initialize.')
       return
     }
 
