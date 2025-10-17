@@ -23,26 +23,67 @@ block view
     .col-12.col-xxl-4
       .card.h-100
         .card-header.d-flex.flex-wrap.align-items-center.justify-content-between.gap-2
-          h5.mb-0 Wi-Fi 鎬ц兘绛涢€?          .d-flex.flex-wrap.gap-2
+          h5.mb-0 Wi-Fi Performance Overview
+          .d-flex.flex-wrap.gap-2
             button#refreshButton.btn.btn-outline-secondary.btn-sm(type='button')
               svg.icon.me-1
                 use(xlink:href='node_modules/@coreui/icons/sprites/free.svg#cil-reload')
-              | 鍒锋柊
+              | Refresh
             button#exportButton.btn.btn-outline-primary.btn-sm(type='button')
               svg.icon.me-1
                 use(xlink:href='node_modules/@coreui/icons/sprites/free.svg#cil-cloud-download')
-              | 瀵煎嚭
+              | Export
         .card-body
           .d-flex.flex-column.gap-4
+            form#filtersForm.row.g-3.align-items-end
+              .col-12.col-md-6.col-xl-4
+                label.form-label(for='filterProductLine') Product Line
+                select#filterProductLine.form-select
+                  option(value='') Loading...
+              .col-12.col-md-6.col-xl-4
+                label.form-label(for='filterProject') Project
+                select#filterProject.form-select
+                  option(value='') Loading...
+              .col-12.col-md-6.col-xl-4
+                label.form-label(for='filterStandard') Standard
+                select#filterStandard.form-select
+                  option(value='') Loading...
+              .col-12.col-md-6.col-xl-4
+                label.form-label(for='filterBand') Band
+                select#filterBand.form-select
+                  option(value='') Loading...
+              .col-12.col-md-6.col-xl-4
+                label.form-label(for='filterBandwidth') Bandwidth
+                select#filterBandwidth.form-select
+                  option(value='') Loading...
+              .col-12.col-md-6.col-xl-4
+                label.form-label(for='filterDeviceType') Device Field
+                select#filterDeviceType.form-select
+                  option(value='') Loading...
+              .col-12.col-md-6.col-xl-4
+                label.form-label(for='filterDeviceValue') Device Value
+                select#filterDeviceValue.form-select(disabled)
+                  option(value='') Select a device field
+              .col-12.col-md-6.col-xl-4
+                label.form-label(for='filterStartDate') Start Date
+                input#filterStartDate.form-control(type='date')
+              .col-12.col-md-6.col-xl-4
+                label.form-label(for='filterEndDate') End Date
+                input#filterEndDate.form-control(type='date')
+              .col-12.d-flex.flex-wrap.gap-2.justify-content-end
+                button.btn.btn-outline-secondary(type='reset') Reset
+                button.btn.btn-primary(type='submit') Apply Filters
+            .bg-body-secondary.bg-opacity-25.border.rounded.p-3
+              p#statusMessage.small.mb-0.text-body-secondary Choose filters and click "Apply Filters" to run the query.
             div
-              h6.fw-semibold.mb-3 Tx（Uplink）
+              h6.fw-semibold.mb-3 Tx (Uplink)
               .chart-container.position-relative(style='min-height: 320px;')
                 canvas#performanceChartTx(style='min-height: 320px; width: 100%;')
                 .text-body-secondary.fw-semibold.position-absolute.top-50.start-50.translate-middle.text-center.p-3.rounded.bg-body.bg-opacity-75#chartEmptyStateTx(style='display: none;')
-                  | Tx 方向暂无数据，请调整筛选条件后重试。
+                  | No data for Tx direction. Adjust the filters and try again.
             div
-              h6.fw-semibold.mb-3 Rx（Downlink）
+              h6.fw-semibold.mb-3 Rx (Downlink)
               .chart-container.position-relative(style='min-height: 320px;')
                 canvas#performanceChartRx(style='min-height: 320px; width: 100%;')
                 .text-body-secondary.fw-semibold.position-absolute.top-50.start-50.translate-middle.text-center.p-3.rounded.bg-body.bg-opacity-75#chartEmptyStateRx(style='display: none;')
-                  | Rx 方向暂无数据，请调整筛选条件后重试。
+                  | No data for Rx direction. Adjust the filters and try again.
