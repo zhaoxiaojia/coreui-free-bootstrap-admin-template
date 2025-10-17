@@ -16,8 +16,8 @@ app.get('/api/health', async (req, res) => {
     await pool.query('SELECT 1')
     res.json({ status: 'ok' })
   } catch (error) {
-    console.error('健康检查失败', error)
-    res.status(500).json({ status: 'error', message: '数据库连接失败' })
+    console.error('Health check failed', error)
+    res.status(500).json({ status: 'error', message: 'Database connection failed' })
   }
 })
 
@@ -25,8 +25,8 @@ app.use('/api/filters', filtersRouter)
 app.use('/api/performance', performanceRouter)
 
 app.use((err, req, res, next) => {
-  console.error('API 错误', err)
-  res.status(500).json({ error: '服务器内部错误' })
+  console.error('API error', err)
+  res.status(500).json({ error: 'Internal server error' })
 })
 
 const port = Number.parseInt(process.env.API_PORT ?? process.env.PORT ?? '5000', 10)

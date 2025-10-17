@@ -338,38 +338,107 @@
       </header>
       <div class="body flex-grow-1">
         <div class="container-lg px-4">
-          <div class="row g-4 flex-column flex-xxl-row">
+          <div class="row g-4">
             <div class="col-12 col-xxl-4">
               <div class="card h-100">
+                <div class="card-header">
+                  <h5 class="mb-0">Filter Controls</h5>
+                </div>
+                <div class="card-body">
+                  <form class="row g-3 align-items-end" id="filtersForm">
+                    <div class="col-12 col-md-6">
+                      <label class="form-label" for="filterProductLine">Product Line</label>
+                      <select class="form-select" id="filterProductLine">
+                        <option value="">All Product Lines</option>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label" for="filterProject">Project</label>
+                      <select class="form-select" id="filterProject">
+                        <option value="">All Projects</option>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label" for="filterStandard">Standard</label>
+                      <select class="form-select" id="filterStandard">
+                        <option value="">All Standards</option>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label" for="filterBand">Band</label>
+                      <select class="form-select" id="filterBand">
+                        <option value="">All Bands</option>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label" for="filterBandwidth">Bandwidth</label>
+                      <select class="form-select" id="filterBandwidth">
+                        <option value="">All Bandwidths</option>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label" for="filterDeviceType">Device Field</label>
+                      <select class="form-select" id="filterDeviceType">
+                        <option value="">All Device Fields</option>
+                        <option value="adb_device">ADB Device</option>
+                        <option value="telnet_ip">Telnet IP</option>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label" for="filterDeviceValue">Device Value</label>
+                      <select class="form-select" disabled id="filterDeviceValue">
+                        <option value="">Select a device field</option>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label" for="filterStartDate">Start Date</label>
+                      <input class="form-control" id="filterStartDate" type="date">
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label" for="filterEndDate">End Date</label>
+                      <input class="form-control" id="filterEndDate" type="date">
+                    </div>
+                    <div class="col-12 d-flex flex-wrap gap-2 justify-content-end">
+                      <button class="btn btn-outline-secondary" type="reset">Reset</button>
+                      <button class="btn btn-primary" type="submit">Apply Filters</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-xxl-8">
+              <div class="card h-100">
                 <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-                  <h5 class="mb-0">Wi-Fi 鎬ц兘绛涢€?          .d-flex.flex-wrap.gap-2
+                  <h5 class="mb-0">Wi-Fi Performance Overview</h5>
+                  <div class="d-flex flex-wrap gap-2">
                     <button class="btn btn-outline-secondary btn-sm" id="refreshButton" type="button">
                       <svg class="icon me-1">
                         <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-reload"></use>
-                      </svg>鍒锋柊
+                      </svg>Refresh
                     </button>
                     <button class="btn btn-outline-primary btn-sm" id="exportButton" type="button">
                       <svg class="icon me-1">
                         <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-cloud-download"></use>
-                      </svg>瀵煎嚭
+                      </svg>Export
                     </button>
-                  </h5>
+                  </div>
                 </div>
-                <div class="card-body">
-                  <div class="d-flex flex-column gap-4">
-                    <div>
-                      <h6 class="fw-semibold mb-3">Tx（Uplink）</h6>
-                      <div class="chart-container position-relative" style="min-height: 320px;">
-                        <canvas id="performanceChartTx" style="min-height: 320px; width: 100%;"></canvas>
-                        <div class="text-body-secondary fw-semibold position-absolute top-50 start-50 translate-middle text-center p-3 rounded bg-body bg-opacity-75" id="chartEmptyStateTx" style="display: none;">Tx 方向暂无数据，请调整筛选条件后重试。</div>
-                      </div>
+                <div class="card-body d-flex flex-column gap-4">
+                  <div class="bg-body-secondary bg-opacity-25 border rounded p-3">
+                    <p class="small mb-0 text-body-secondary" id="statusMessage">Choose filters and click "Apply Filters" to run the query.</p>
+                  </div>
+                  <div>
+                    <h6 class="fw-semibold mb-3">Tx (Uplink)</h6>
+                    <div class="chart-container position-relative" style="min-height: 320px;">
+                      <canvas id="performanceChartTx" style="min-height: 320px; width: 100%;"></canvas>
+                      <div class="text-body-secondary fw-semibold position-absolute top-50 start-50 translate-middle text-center p-3 rounded bg-body bg-opacity-75" id="chartEmptyStateTx" style="display: none;">No data for Tx direction. Adjust the filters and try again.</div>
                     </div>
-                    <div>
-                      <h6 class="fw-semibold mb-3">Rx（Downlink）</h6>
-                      <div class="chart-container position-relative" style="min-height: 320px;">
-                        <canvas id="performanceChartRx" style="min-height: 320px; width: 100%;"></canvas>
-                        <div class="text-body-secondary fw-semibold position-absolute top-50 start-50 translate-middle text-center p-3 rounded bg-body bg-opacity-75" id="chartEmptyStateRx" style="display: none;">Rx 方向暂无数据，请调整筛选条件后重试。</div>
-                      </div>
+                  </div>
+                  <div>
+                    <h6 class="fw-semibold mb-3">Rx (Downlink)</h6>
+                    <div class="chart-container position-relative" style="min-height: 320px;">
+                      <canvas id="performanceChartRx" style="min-height: 320px; width: 100%;"></canvas>
+                      <div class="text-body-secondary fw-semibold position-absolute top-50 start-50 translate-middle text-center p-3 rounded bg-body bg-opacity-75" id="chartEmptyStateRx" style="display: none;">No data for Rx direction. Adjust the filters and try again.</div>
                     </div>
                   </div>
                 </div>
