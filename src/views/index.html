@@ -44,8 +44,287 @@
     <script src="js/config.js"></script>
     <script src="js/color-modes.js"></script>
     <link rel="stylesheet" href="node_modules/@coreui/chartjs/dist/css/coreui-chartjs.css">
+    <style>
+      body.dashboard-page {
+        background: radial-gradient(circle at 15% 20%, #eef2ff 0%, #e0f2fe 38%, #f8fafc 100%);
+      }
+
+      body.dashboard-page .wrapper {
+        background: transparent;
+      }
+
+      .dashboard-content {
+        padding-top: 2.5rem;
+        padding-bottom: 3rem;
+      }
+
+      .dashboard-hero {
+        border-radius: 1.75rem;
+        background: linear-gradient(135deg, rgba(79, 70, 229, 0.95), rgba(14, 165, 233, 0.95));
+        box-shadow: 0 1.75rem 3.5rem -2.5rem rgba(15, 23, 42, 0.85);
+        overflow: hidden;
+        position: relative;
+      }
+
+      .dashboard-hero::after {
+        content: "";
+        position: absolute;
+        inset: auto -12rem -12rem auto;
+        width: 24rem;
+        height: 24rem;
+        background: radial-gradient(circle, rgba(244, 244, 255, 0.45) 0%, rgba(255, 255, 255, 0) 65%);
+        transform: rotate(25deg);
+      }
+
+      .dashboard-hero h1,
+      .dashboard-hero p,
+      .dashboard-hero .hero-stat {
+        color: #ffffff;
+      }
+
+      .dashboard-hero p {
+        max-width: 48rem;
+        color: rgba(255, 255, 255, 0.82);
+      }
+
+      .hero-stats {
+        gap: 1.5rem;
+      }
+
+      .hero-stat {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: 8rem;
+      }
+
+      .hero-stat__label {
+        font-size: 0.875rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        opacity: 0.7;
+      }
+
+      .hero-stat__value {
+        font-size: clamp(1.5rem, 1.3rem + 0.8vw, 2rem);
+        font-weight: 600;
+        display: flex;
+        align-items: baseline;
+        gap: 0.35rem;
+      }
+
+      .hero-stat__trend {
+        font-size: 0.875rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.25rem 0.6rem;
+        border-radius: 999px;
+        background: rgba(15, 118, 110, 0.22);
+      }
+
+      .hero-stat__trend .icon {
+        width: 1rem;
+        height: 1rem;
+      }
+
+      .metric-card {
+        position: relative;
+        border: 0;
+        border-radius: 1.25rem;
+        padding: 1.75rem;
+        color: #ffffff;
+        overflow: hidden;
+        box-shadow: 0 1.5rem 3rem -2rem rgba(30, 64, 175, 0.65);
+      }
+
+      .metric-card::after {
+        content: "";
+        position: absolute;
+        inset: -30% auto auto -30%;
+        width: 12rem;
+        height: 12rem;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.12);
+        filter: blur(0);
+        opacity: 0.9;
+      }
+
+      .metric-card .metric-icon {
+        width: 3rem;
+        height: 3rem;
+        border-radius: 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.18);
+        margin-bottom: 1.25rem;
+        position: relative;
+        z-index: 1;
+      }
+
+      .metric-card .metric-icon .icon {
+        width: 1.75rem;
+        height: 1.75rem;
+        color: #ffffff;
+      }
+
+      .metric-card .metric-label {
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        opacity: 0.7;
+        margin-bottom: 0.35rem;
+        position: relative;
+        z-index: 1;
+      }
+
+      .metric-card .metric-value {
+        font-size: clamp(1.75rem, 1.4rem + 1vw, 2.35rem);
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+        position: relative;
+        z-index: 1;
+      }
+
+      .metric-card .metric-trend {
+        font-size: 0.95rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        opacity: 0.88;
+        position: relative;
+        z-index: 1;
+      }
+
+      .metric-card.gradient-indigo {
+        background: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
+      }
+
+      .metric-card.gradient-pink {
+        background: linear-gradient(135deg, #db2777 0%, #f472b6 100%);
+      }
+
+      .metric-card.gradient-amber {
+        background: linear-gradient(135deg, #d97706 0%, #fbbf24 100%);
+      }
+
+      .metric-card.gradient-emerald {
+        background: linear-gradient(135deg, #0f766e 0%, #34d399 100%);
+      }
+
+      .dashboard-page .card-glass {
+        border: 0;
+        border-radius: 1.5rem;
+        background: rgba(255, 255, 255, 0.88);
+        box-shadow: 0 1.75rem 3.5rem -2.5rem rgba(15, 23, 42, 0.4);
+        backdrop-filter: blur(12px);
+      }
+
+      .dashboard-page .card-glass .card-header {
+        border: 0;
+        background: transparent;
+        color: #1f2937;
+        padding-bottom: 0;
+      }
+
+      .dashboard-page .card-glass .card-body {
+        color: #1f2937;
+      }
+
+      .dashboard-page .card-glass .form-label {
+        color: #1f2937;
+        font-weight: 600;
+      }
+
+      .dashboard-page .card-glass .form-select,
+      .dashboard-page .card-glass .form-control {
+        background: rgba(248, 250, 252, 0.9);
+        border-color: rgba(148, 163, 184, 0.45);
+        color: #0f172a;
+      }
+
+      .dashboard-page .card-glass .form-select:focus,
+      .dashboard-page .card-glass .form-control:focus {
+        border-color: rgba(99, 102, 241, 0.8);
+        box-shadow: 0 0 0 0.25rem rgba(99, 102, 241, 0.18);
+      }
+
+      .status-banner {
+        border-radius: 1.25rem;
+        padding: 1.25rem 1.5rem;
+        background: linear-gradient(135deg, rgba(96, 165, 250, 0.18), rgba(59, 130, 246, 0.4));
+        border: 1px solid rgba(37, 99, 235, 0.18);
+        color: #1e3a8a;
+        font-weight: 500;
+      }
+
+      .status-banner #statusMessage {
+        margin-bottom: 0;
+      }
+
+      .chart-section > h6 {
+        color: #1f2937;
+      }
+
+      .chart-container {
+        background: rgba(248, 250, 252, 0.65);
+        border-radius: 1.25rem;
+        padding: 1.25rem;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+      }
+
+      .chart-empty-state {
+        color: rgba(15, 23, 42, 0.75) !important;
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 1rem;
+        border: 1px dashed rgba(148, 163, 184, 0.45);
+        padding: 1.5rem;
+      }
+
+      .dashboard-page .btn-outline-secondary {
+        border-color: rgba(148, 163, 184, 0.6);
+        color: #334155;
+      }
+
+      .dashboard-page .btn-outline-secondary:hover {
+        background: rgba(148, 163, 184, 0.12);
+        color: #1f2937;
+      }
+
+      .dashboard-page .btn-primary {
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        border: 0;
+        box-shadow: 0 0.75rem 2rem -1rem rgba(79, 70, 229, 0.8);
+      }
+
+      .dashboard-page .btn-primary:hover {
+        background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+      }
+
+      @media (max-width: 991.98px) {
+        .dashboard-hero {
+          text-align: center;
+        }
+
+        .hero-stats {
+          justify-content: center;
+        }
+      }
+
+      @media (max-width: 575.98px) {
+        .dashboard-content {
+          padding-left: 1.25rem;
+          padding-right: 1.25rem;
+        }
+
+        .metric-card {
+          border-radius: 1rem;
+        }
+      }
+    </style>
   </head>
-  <body>
+  <body class="dashboard-page">
     <div class="sidebar sidebar-dark sidebar-fixed border-end" id="sidebar">
       <div class="sidebar-header border-bottom">
         <div class="sidebar-brand">
@@ -219,7 +498,7 @@
         <button class="sidebar-toggler" type="button" data-coreui-toggle="unfoldable"></button>
       </div>
     </div>
-    <div class="wrapper d-flex flex-column min-vh-100">
+    <div class="wrapper d-flex flex-column min-vh-100 dashboard-wrapper">
       <header class="header header-sticky p-0 mb-4">
         <div class="container-fluid border-bottom px-4">
           <button class="header-toggler" type="button" onclick="coreui.Sidebar.getInstance(document.querySelector('#sidebar')).toggle()" style="margin-inline-start: -14px;">
@@ -337,10 +616,108 @@
         </div>
       </header>
       <div class="body flex-grow-1">
-        <div class="container-lg px-4">
+        <div class="container-fluid px-4 px-xl-5 dashboard-content">
+          <div class="dashboard-hero card border-0 text-white mb-4">
+            <div class="card-body p-4 p-xl-5">
+              <div class="row g-4 align-items-center">
+                <div class="col-lg-8">
+                  <h1 class="display-6 fw-semibold mb-3">Wi-Fi 性能驾驶舱</h1>
+                  <p class="mb-0">实时洞察实验室无线网络的吞吐、延迟与容量，让团队快速定位瓶颈并聚焦关键指标。</p>
+                </div>
+                <div class="col-lg-4">
+                  <div class="hero-stats d-flex flex-wrap justify-content-lg-end">
+                    <div class="hero-stat">
+                      <span class="hero-stat__label">SLA 合格率</span>
+                      <span class="hero-stat__value">98.4%</span>
+                      <span class="hero-stat__trend">
+                        <svg class="icon">
+                          <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-arrow-circle-top"></use>
+                        </svg>
+                        +2.1%
+                      </span>
+                    </div>
+                    <div class="hero-stat">
+                      <span class="hero-stat__label">最新更新时间</span>
+                      <span class="hero-stat__value">5 分钟前</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="row g-4 mb-4">
+            <div class="col-12 col-sm-6 col-xl-3">
+              <div class="metric-card gradient-indigo h-100">
+                <div class="metric-icon">
+                  <svg class="icon">
+                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-speedometer"></use>
+                  </svg>
+                </div>
+                <div class="metric-label">实时吞吐（Tx）</div>
+                <div class="metric-value">612 Mbps</div>
+                <div class="metric-trend">
+                  <svg class="icon">
+                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-arrow-top"></use>
+                  </svg>
+                  较上周 +12%
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-sm-6 col-xl-3">
+              <div class="metric-card gradient-pink h-100">
+                <div class="metric-icon">
+                  <svg class="icon">
+                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-wifi-signal"></use>
+                  </svg>
+                </div>
+                <div class="metric-label">实时吞吐（Rx）</div>
+                <div class="metric-value">588 Mbps</div>
+                <div class="metric-trend">
+                  <svg class="icon">
+                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-arrow-top"></use>
+                  </svg>
+                  较上周 +9%
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-sm-6 col-xl-3">
+              <div class="metric-card gradient-amber h-100">
+                <div class="metric-icon">
+                  <svg class="icon">
+                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-layers"></use>
+                  </svg>
+                </div>
+                <div class="metric-label">活跃测试</div>
+                <div class="metric-value">128 次</div>
+                <div class="metric-trend">
+                  <svg class="icon">
+                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-calendar"></use>
+                  </svg>
+                  本周计划 142
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-sm-6 col-xl-3">
+              <div class="metric-card gradient-emerald h-100">
+                <div class="metric-icon">
+                  <svg class="icon">
+                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-chart-line"></use>
+                  </svg>
+                </div>
+                <div class="metric-label">平均延迟</div>
+                <div class="metric-value">18 ms</div>
+                <div class="metric-trend">
+                  <svg class="icon">
+                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-arrow-bottom"></use>
+                  </svg>
+                  较昨日 -4%
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="row g-4">
-            <div class="col-12 col-xxl-4">
-              <div class="card h-100">
+            <div class="col-12 col-xl-4 col-xxl-3">
+              <div class="card h-100 card-glass">
                 <div class="card-header">
                   <h5 class="mb-0">Filter Controls</h5>
                 </div>
@@ -406,8 +783,8 @@
                 </div>
               </div>
             </div>
-            <div class="col-12 col-xxl-8">
-              <div class="card h-100">
+            <div class="col-12 col-xl-8 col-xxl-9">
+              <div class="card h-100 card-glass">
                 <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
                   <h5 class="mb-0">Wi-Fi Performance Overview</h5>
                   <div class="d-flex flex-wrap gap-2">
@@ -424,21 +801,21 @@
                   </div>
                 </div>
                 <div class="card-body d-flex flex-column gap-4">
-                  <div class="bg-body-secondary bg-opacity-25 border rounded p-3">
-                    <p class="small mb-0 text-body-secondary" id="statusMessage">Choose filters and click "Apply Filters" to run the query.</p>
+                  <div class="status-banner">
+                    <p class="small mb-0" id="statusMessage">Choose filters and click "Apply Filters" to run the query.</p>
                   </div>
-                  <div>
+                  <div class="chart-section">
                     <h6 class="fw-semibold mb-3">Tx (Uplink)</h6>
                     <div class="chart-container position-relative" style="min-height: 320px;">
                       <canvas id="performanceChartTx" style="min-height: 320px; width: 100%;"></canvas>
-                      <div class="text-body-secondary fw-semibold position-absolute top-50 start-50 translate-middle text-center p-3 rounded bg-body bg-opacity-75" id="chartEmptyStateTx" style="display: none;">No data for Tx direction. Adjust the filters and try again.</div>
+                      <div class="chart-empty-state fw-semibold position-absolute top-50 start-50 translate-middle text-center" id="chartEmptyStateTx" style="display: none;">No data for Tx direction. Adjust the filters and try again.</div>
                     </div>
                   </div>
-                  <div>
+                  <div class="chart-section">
                     <h6 class="fw-semibold mb-3">Rx (Downlink)</h6>
                     <div class="chart-container position-relative" style="min-height: 320px;">
                       <canvas id="performanceChartRx" style="min-height: 320px; width: 100%;"></canvas>
-                      <div class="text-body-secondary fw-semibold position-absolute top-50 start-50 translate-middle text-center p-3 rounded bg-body bg-opacity-75" id="chartEmptyStateRx" style="display: none;">No data for Rx direction. Adjust the filters and try again.</div>
+                      <div class="chart-empty-state fw-semibold position-absolute top-50 start-50 translate-middle text-center" id="chartEmptyStateRx" style="display: none;">No data for Rx direction. Adjust the filters and try again.</div>
                     </div>
                   </div>
                 </div>
