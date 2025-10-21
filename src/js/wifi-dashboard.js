@@ -260,42 +260,41 @@
     return null
   }
 
+  const buildSeriesKey = item => {
+    const reportComponent = item.testReportId !== null && item.testReportId !== undefined
+      ? String(item.testReportId)
+      : 'unknown-report'
+    if (item.scenarioGroupKey) {
+      return `${reportComponent}__${item.scenarioGroupKey}`
+    }
+
+    return reportComponent
+  }
+
   const buildDatasetLabel = item => {
     const parts = []
-    if (item.testReportId) {
-      parts.push(`Report ${item.testReportId}`)
-    }
 
-    if (item.casePath) {
-      const segments = `${item.casePath}`.split(/[\\/]/).filter(Boolean)
-      parts.push(segments.pop() ?? item.casePath)
-    } else {
-      if (item.testCategory) {
-        parts.push(item.testCategory)
-      }
-
-      if (item.band) {
-        const bandLabel = formatBand(item.band) || item.band
-        if (bandLabel) {
-          parts.push(`Band ${bandLabel}`)
-        }
-      }
-
-      if (Number.isFinite(item.bandwidthMhz)) {
-        parts.push(`${item.bandwidthMhz}MHz`)
-      }
-
-      const channel = deriveChannelFromFrequency(item.centerFreqMhz)
-      if (channel !== null) {
-        parts.push(`CH ${channel}`)
-      }
-
-      if (item.protocol) {
-        parts.push(item.protocol.toUpperCase())
+    if (item.band) {
+      const bandLabel = formatBand(item.band) || item.band
+      if (bandLabel) {
+        parts.push(bandLabel)
       }
     }
 
-    return parts.length > 0 ? parts.join(' · ') : 'Unknown Test'
+    if (Number.isFinite(item.bandwidthMhz)) {
+      parts.push(`${item.bandwidthMhz}MHz`)
+    }
+
+    if (item.standard) {
+      parts.push(item.standard.toUpperCase())
+    }
+
+    const channel = deriveChannelFromFrequency(item.centerFreqMhz)
+    if (channel !== null) {
+      parts.push(`CH ${channel}`)
+    }
+
+    return parts.length > 0 ? parts.join(' ') : 'Unknown Test'
   }
 
   const COLOR_TOKEN_SETS = [
@@ -453,23 +452,24 @@
         return
       }
 
-      const key = item.testReportId
-      if (!key) {
+      const seriesKey = buildSeriesKey(item)
+      if (!seriesKey) {
         return
       }
 
-      if (!bucket.has(key)) {
-        bucket.set(key, {
+      if (!bucket.has(seriesKey)) {
+        bucket.set(seriesKey, {
           label: buildDatasetLabel(item),
           points: []
         })
       }
 
-      bucket.get(key).points.push({
+      bucket.get(seriesKey).points.push({
         x: item.pathLossDb,
         y: item.throughputAvgMbps,
         createdAt: item.createdAt,
         testReportId: item.testReportId,
+        scenarioGroupKey: item.scenarioGroupKey,
         band: item.band,
         bandwidthMhz: item.bandwidthMhz,
         standard: item.standard,
@@ -520,7 +520,15 @@
             position: 'top',
             labels: {
               usePointStyle: true,
-              padding: 16
+              padding: 16,
+              boxHeight: 10,
+              boxWidth: 20,
+              color: coreui.Utils.getStyle('--cui-body-color'),
+              font: {
+                size: 14,
+                weight: '600',
+                family: coreui.Utils.getStyle('--cui-body-font-family') || 'inherit'
+              }
             }
           },
           tooltip: {
@@ -827,6 +835,4 @@
 
   document.addEventListener('DOMContentLoaded', init)
 })()
-
-
 
