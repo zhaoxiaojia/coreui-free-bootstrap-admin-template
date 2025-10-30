@@ -16,6 +16,7 @@
   const form = document.getElementById('filtersForm')
   const productLineSelect = document.getElementById('filterProductLine')
   const projectSelect = document.getElementById('filterProject')
+  const testReportSelect = document.getElementById('filterTestReport')
   const standardSelect = document.getElementById('filterStandard')
   const bandSelect = document.getElementById('filterBand')
   const bandwidthSelect = document.getElementById('filterBandwidth')
@@ -359,6 +360,7 @@
     return {
       product_line: productLineSelect.value || '',
       project: projectSelect.value || '',
+      test_report_csv_name: testReportSelect?.value || '',
       standard: standardSelect.value || '',
       band: bandSelect.value || '',
       bandwidth_mhz: bandwidthSelect.value || '',
@@ -918,6 +920,9 @@
         isSyncingFilters = true
         populateSelect(productLineSelect, filterOptions.productLines, 'All Product Lines')
         populateSelect(projectSelect, filterOptions.projects, 'All Projects')
+        if (testReportSelect) {
+          populateSelect(testReportSelect, filterOptions.testReports ?? [], 'All Test Reports')
+        }
         populateSelect(standardSelect, filterOptions.standards, 'All Standards')
         populateSelect(
           bandSelect,
@@ -1007,6 +1012,7 @@
     deviceTypeSelect.addEventListener('change', handleDeviceTypeChange)
     productLineSelect.addEventListener('change', handleCriteriaChange)
     projectSelect.addEventListener('change', handleCriteriaChange)
+    testReportSelect?.addEventListener('change', handleCriteriaChange)
 
     loadFiltersAndData({ refreshFilters: true, refreshData: false, initial: true })
   }
