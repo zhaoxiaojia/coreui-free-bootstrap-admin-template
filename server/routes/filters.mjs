@@ -1,6 +1,12 @@
 import { Router } from 'express'
 import pool from '../db.mjs'
-import { allowedDeviceOptions, buildDutConditions, buildPerformanceConditions, normalizeFilters } from '../utils/filter-utils.mjs'
+import {
+  allowedDeviceOptions,
+  buildDutConditions,
+  buildPerformanceConditions,
+  buildTestReportConditions,
+  normalizeFilters
+} from '../utils/filter-utils.mjs'
 
 const router = Router()
 
@@ -76,13 +82,34 @@ router.get('/', async (req, res, next) => {
       bandwidthQuery += ' ORDER BY p.bandwidth_mhz'
       const [bandwidths] = await connection.query(bandwidthQuery, bandwidthFilter.params)
 
+      const testReportFilter = buildTestReportConditions(filters, { exclude: ['testReport'] })
+      let testReportQuery = `
+        SELECT DISTINCT tr.csv_name AS value
+        FROM test_report tr
+        INNER JOIN dut d ON d.id = tr.dut_id
+      `
+      if (testReportFilter.requiresPerformanceJoin) {
+        testReportQuery += `
+          INNER JOIN performance p ON p.test_report_id = tr.id
+        `
+      }
+      testReportQuery += `
+        WHERE tr.csv_name IS NOT NULL
+      `
+      if (testReportFilter.conditions.length > 0) {
+        testReportQuery += ` AND ${testReportFilter.conditions.join(' AND ')}`
+      }
+      testReportQuery += ' ORDER BY tr.csv_name'
+      const [testReports] = await connection.query(testReportQuery, testReportFilter.params)
+
       res.json({
         productLines: productLines.map(row => row.product_line),
         projects: projects.map(row => row.project),
         devices: deviceResults,
         standards: standards.map(row => row.value),
         bands: bands.map(row => row.value),
-        bandwidths: bandwidths.map(row => row.value)
+        bandwidths: bandwidths.map(row => row.value),
+        testReports: testReports.map(row => row.value)
       })
     } finally {
       connection.release()
