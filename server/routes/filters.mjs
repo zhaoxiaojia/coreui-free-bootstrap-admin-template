@@ -76,13 +76,28 @@ router.get('/', async (req, res, next) => {
       bandwidthQuery += ' ORDER BY p.bandwidth_mhz'
       const [bandwidths] = await connection.query(bandwidthQuery, bandwidthFilter.params)
 
+      const testReportFilter = buildPerformanceConditions(filters, { exclude: ['testReport'], includeBase: false })
+      let testReportQuery = `
+        SELECT DISTINCT tr.csv_name AS value
+        FROM performance p
+        INNER JOIN test_report tr ON tr.id = p.test_report_id
+        INNER JOIN dut d ON d.id = tr.dut_id
+        WHERE tr.csv_name IS NOT NULL
+      `
+      if (testReportFilter.conditions.length > 0) {
+        testReportQuery += ` AND ${testReportFilter.conditions.join(' AND ')}`
+      }
+      testReportQuery += ' ORDER BY tr.csv_name'
+      const [testReports] = await connection.query(testReportQuery, testReportFilter.params)
+
       res.json({
         productLines: productLines.map(row => row.product_line),
         projects: projects.map(row => row.project),
         devices: deviceResults,
         standards: standards.map(row => row.value),
         bands: bands.map(row => row.value),
-        bandwidths: bandwidths.map(row => row.value)
+        bandwidths: bandwidths.map(row => row.value),
+        testReports: testReports.map(row => row.value)
       })
     } finally {
       connection.release()

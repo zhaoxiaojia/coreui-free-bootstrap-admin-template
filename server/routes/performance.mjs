@@ -169,6 +169,7 @@ router.get('/', async (req, res, next) => {
         filters: {
           productLine: filters.productLine,
           project: filters.project,
+          testReportCsvName: filters.testReportCsvName,
           standard: filters.standard,
           band: filters.band,
           bandwidthMhz: filters.bandwidthMhz,

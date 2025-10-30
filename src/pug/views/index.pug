@@ -104,6 +104,10 @@ block view
               select#filterProject.form-select
                 option(value='') All Projects
             .col-12.col-md-6
+              label.form-label(for='filterTestReport') Test Report
+              select#filterTestReport.form-select
+                option(value='') All Test Reports
+            .col-12.col-md-6
               label.form-label(for='filterStandard') Standard
               select#filterStandard.form-select
                 option(value='') All Standards
@@ -150,15 +154,4 @@ block view
         .card-body.d-flex.flex-column.gap-4
           .status-banner
             p#statusMessage.small.mb-0 Choose filters and click "Apply Filters" to run the query.
-          .chart-section
-            h6.fw-semibold.mb-3 Tx (Uplink)
-            .chart-container.position-relative(style='min-height: 320px;')
-              canvas#performanceChartTx(style='min-height: 320px; width: 100%;')
-              .chart-empty-state.fw-semibold.position-absolute.top-50.start-50.translate-middle.text-center#chartEmptyStateTx(style='display: none;')
-                | No data for Tx direction. Adjust the filters and try again.
-          .chart-section
-            h6.fw-semibold.mb-3 Rx (Downlink)
-            .chart-container.position-relative(style='min-height: 320px;')
-              canvas#performanceChartRx(style='min-height: 320px; width: 100%;')
-              .chart-empty-state.fw-semibold.position-absolute.top-50.start-50.translate-middle.text-center#chartEmptyStateRx(style='display: none;')
-                | No data for Rx direction. Adjust the filters and try again.
+          #performanceChartGroups.d-flex.flex-column.gap-4

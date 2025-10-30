@@ -53,6 +53,9 @@ export const normalizeFilters = query => {
   const standard = trimOrNull(query.standard)
   const band = trimOrNull(query.band)
   const bandwidthMhz = parseNumber(query.bandwidth_mhz ?? query.bandwidthMhz)
+  const testReportCsvName = trimOrNull(
+    query.test_report_csv_name ?? query.testReportCsvName ?? query.test_report ?? query.testReport ?? query.csv_name ?? query.csvName
+  )
 
   const requestedDeviceType = trimOrNull(query.deviceType ?? query.device_type)
   const deviceColumn = allowedDeviceColumns.has(requestedDeviceType) ? requestedDeviceType : null
@@ -68,6 +71,7 @@ export const normalizeFilters = query => {
     standard,
     band,
     bandwidthMhz,
+    testReportCsvName,
     deviceTypeRaw: requestedDeviceType,
     deviceColumn,
     deviceValue,
@@ -136,6 +140,11 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
   if (!exclude.includes('bandwidth') && filters.bandwidthMhz !== null) {
     conditions.push('p.bandwidth_mhz = ?')
     params.push(filters.bandwidthMhz)
+  }
+
+  if (!exclude.includes('testReport') && filters.testReportCsvName) {
+    conditions.push('tr.csv_name = ?')
+    params.push(filters.testReportCsvName)
   }
 
   if (!exclude.includes('startDate') && filters.startDate) {
