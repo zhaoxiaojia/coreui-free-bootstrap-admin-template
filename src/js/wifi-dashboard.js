@@ -46,6 +46,573 @@
   let cachedFilterOptions = null
   let isSyncingFilters = false
 
+  const multiSelectControllers = new Map()
+
+  const normalizeOptionRecord = raw => {
+    if (raw && typeof raw === 'object' && 'value' in raw) {
+      const value = raw.value ?? ''
+      const label = raw.label ?? `${value}`
+      return { value: `${value}`, label: label === undefined || label === null ? `${value}` : `${label}` }
+    }
+
+    if (raw === null || raw === undefined) {
+      return null
+    }
+
+    const value = `${raw}`
+    return { value, label: value }
+  }
+
+  class DropdownMultiSelect {
+    constructor(select, { placeholder, searchPlaceholder = 'Search…', showSelectAll = true } = {}) {
+      if (!select) {
+        throw new Error('DropdownMultiSelect requires a select element')
+      }
+
+      this.select = select
+      this.placeholder = placeholder || 'Select options'
+      this.searchPlaceholder = searchPlaceholder || 'Search…'
+      this.showSelectAll = showSelectAll
+      this.disabled = Boolean(select.disabled)
+      this.isOpen = false
+      this.options = []
+      this.optionLookup = new Map()
+      this.optionItems = new Map()
+      this.selectedValues = new Set()
+
+      this.handleDocumentClick = this.handleDocumentClick.bind(this)
+      this.handleDocumentKeyDown = this.handleDocumentKeyDown.bind(this)
+      this.handleControlKeyDown = this.handleControlKeyDown.bind(this)
+
+      this.initialize()
+    }
+
+    initialize() {
+      this.select.multiple = true
+      this.select.classList.add('d-none')
+
+      this.container = document.createElement('div')
+      this.container.className = 'multi-select'
+      if (this.select.id) {
+        this.container.dataset.selectTarget = this.select.id
+      }
+
+      this.control = document.createElement('button')
+      this.control.type = 'button'
+      this.control.className = 'multi-select__control form-select d-flex align-items-center justify-content-between'
+      this.control.setAttribute('aria-haspopup', 'listbox')
+      this.control.setAttribute('aria-expanded', 'false')
+      this.control.disabled = this.disabled
+
+      this.summary = document.createElement('div')
+      this.summary.className = 'multi-select__summary placeholder text-truncate'
+      this.summary.textContent = this.placeholder
+
+      this.tags = document.createElement('div')
+      this.tags.className = 'multi-select__tags flex-wrap'
+      this.tags.hidden = true
+
+      this.control.append(this.summary, this.tags)
+
+      this.dropdown = document.createElement('div')
+      this.dropdown.className = 'multi-select__dropdown card border-0 shadow-lg'
+      this.dropdown.setAttribute('role', 'listbox')
+      this.dropdown.setAttribute('aria-multiselectable', 'true')
+      this.dropdown.setAttribute('aria-hidden', 'true')
+
+      this.searchWrapper = document.createElement('div')
+      this.searchWrapper.className = 'multi-select__search p-2 border-bottom'
+
+      this.searchInput = document.createElement('input')
+      this.searchInput.type = 'search'
+      this.searchInput.className = 'form-control form-control-sm'
+      this.searchInput.placeholder = this.searchPlaceholder
+      this.searchInput.setAttribute('aria-label', 'Search options')
+
+      this.searchWrapper.appendChild(this.searchInput)
+
+      this.optionsContainer = document.createElement('div')
+      this.optionsContainer.className = 'multi-select__options'
+
+      this.emptyState = document.createElement('div')
+      this.emptyState.className = 'multi-select__empty text-body-secondary small text-center'
+      this.emptyState.textContent = 'No options available'
+      this.emptyState.hidden = true
+
+      this.actions = document.createElement('div')
+      this.actions.className = 'multi-select__actions d-flex gap-2 border-top p-2'
+
+      this.clearButton = document.createElement('button')
+      this.clearButton.type = 'button'
+      this.clearButton.className = 'btn btn-light btn-sm flex-fill'
+      this.clearButton.textContent = 'Clear'
+
+      this.selectAllButton = document.createElement('button')
+      this.selectAllButton.type = 'button'
+      this.selectAllButton.className = 'btn btn-primary btn-sm flex-fill'
+      this.selectAllButton.textContent = 'Select All'
+
+      this.actions.append(this.clearButton, this.selectAllButton)
+
+      this.dropdown.append(this.searchWrapper, this.optionsContainer, this.emptyState, this.actions)
+      this.container.append(this.control, this.dropdown)
+
+      this.select.parentNode?.insertBefore(this.container, this.select.nextSibling)
+
+      this.attachBaseEvents()
+      this.syncFromSelect()
+      this.updateActionStates()
+    }
+
+    attachBaseEvents() {
+      this.control.addEventListener('click', () => {
+        if (this.disabled) {
+          return
+        }
+
+        this.toggle()
+      })
+      this.control.addEventListener('keydown', this.handleControlKeyDown)
+
+      this.searchInput.addEventListener('input', () => {
+        this.applyFilter(this.searchInput.value)
+      })
+
+      this.clearButton.addEventListener('click', () => {
+        if (this.disabled) {
+          return
+        }
+
+        this.clear(false)
+        this.focusSearch()
+      })
+
+      if (this.showSelectAll) {
+        this.selectAllButton.addEventListener('click', () => {
+          if (this.disabled || this.options.length === 0) {
+            return
+          }
+
+          if (this.selectedValues.size === this.options.length) {
+            this.clear(false)
+          } else {
+            this.selectAll(false)
+          }
+          this.focusSearch()
+        })
+      } else {
+        this.selectAllButton.classList.add('d-none')
+      }
+
+      this.optionsContainer.addEventListener('change', event => {
+        const target = event.target
+        if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') {
+          return
+        }
+
+        this.toggleValue(target.value, target.checked)
+      })
+    }
+
+    handleControlKeyDown(event) {
+      if (this.disabled) {
+        return
+      }
+
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        this.toggle()
+        return
+      }
+
+      if (event.key === 'Escape' && this.isOpen) {
+        event.preventDefault()
+        this.close()
+      }
+    }
+
+    handleDocumentClick(event) {
+      if (!this.container.contains(event.target)) {
+        this.close()
+      }
+    }
+
+    handleDocumentKeyDown(event) {
+      if (event.key === 'Escape') {
+        this.close()
+        this.control.focus({ preventScroll: true })
+      }
+    }
+
+    open() {
+      if (this.isOpen || this.disabled) {
+        return
+      }
+
+      this.isOpen = true
+      this.container.classList.add('is-open')
+      this.dropdown.setAttribute('aria-hidden', 'false')
+      this.control.setAttribute('aria-expanded', 'true')
+
+      document.addEventListener('mousedown', this.handleDocumentClick)
+      document.addEventListener('touchstart', this.handleDocumentClick)
+      document.addEventListener('keydown', this.handleDocumentKeyDown)
+
+      window.requestAnimationFrame(() => {
+        this.searchInput.focus({ preventScroll: true })
+      })
+    }
+
+    close() {
+      if (!this.isOpen) {
+        return
+      }
+
+      this.isOpen = false
+      this.container.classList.remove('is-open')
+      this.dropdown.setAttribute('aria-hidden', 'true')
+      this.control.setAttribute('aria-expanded', 'false')
+
+      document.removeEventListener('mousedown', this.handleDocumentClick)
+      document.removeEventListener('touchstart', this.handleDocumentClick)
+      document.removeEventListener('keydown', this.handleDocumentKeyDown)
+
+      this.searchInput.value = ''
+      this.applyFilter('')
+    }
+
+    toggle() {
+      if (this.isOpen) {
+        this.close()
+      } else {
+        this.open()
+      }
+    }
+
+    focusSearch() {
+      if (this.isOpen) {
+        this.searchInput.focus({ preventScroll: true })
+      }
+    }
+
+    applyFilter(term) {
+      const normalized = term.trim().toLowerCase()
+      let visibleCount = 0
+
+      this.optionItems.forEach(item => {
+        const matches = !normalized || item.searchText.includes(normalized)
+        item.element.hidden = !matches
+        if (matches) {
+          visibleCount += 1
+        }
+      })
+
+      if (this.options.length === 0) {
+        this.emptyState.hidden = false
+        this.emptyState.textContent = 'No options available'
+      } else {
+        this.emptyState.hidden = visibleCount > 0
+        if (visibleCount === 0) {
+          this.emptyState.textContent = 'No matches found'
+        }
+      }
+    }
+
+    syncFromSelect() {
+      const selected = Array.from(this.select.options)
+        .filter(option => option.value !== '' && option.selected)
+        .map(option => option.value)
+      this.selectedValues = new Set(selected)
+      this.updateSummary()
+      this.updateActionStates()
+    }
+
+    setPlaceholder(nextPlaceholder) {
+      if (nextPlaceholder && nextPlaceholder !== this.placeholder) {
+        this.placeholder = nextPlaceholder
+      }
+      this.updateSummary()
+    }
+
+    setOptions(optionList, { preserveSelection = true } = {}) {
+      const normalizedOptions = optionList
+        .map(normalizeOptionRecord)
+        .filter(option => option !== null)
+
+      this.options = normalizedOptions
+      this.optionLookup = new Map(normalizedOptions.map(option => [option.value, option.label]))
+      this.optionItems.clear()
+
+      const previousSelection = preserveSelection ? Array.from(this.selectedValues) : []
+      this.selectedValues = new Set(previousSelection.filter(value => this.optionLookup.has(value)))
+
+      this.rebuildSelectElement()
+      this.renderOptions()
+      this.updateSummary()
+      this.updateActionStates()
+    }
+
+    rebuildSelectElement() {
+      const previousFocus = this.select.contains(document.activeElement) ? document.activeElement : null
+      this.select.innerHTML = ''
+
+      this.options.forEach(option => {
+        const optionElement = document.createElement('option')
+        optionElement.value = option.value
+        optionElement.textContent = option.label
+        optionElement.selected = this.selectedValues.has(option.value)
+        this.select.appendChild(optionElement)
+      })
+
+      if (previousFocus && typeof previousFocus.focus === 'function') {
+        previousFocus.focus({ preventScroll: true })
+      }
+    }
+
+    renderOptions() {
+      this.optionsContainer.innerHTML = ''
+      this.optionItems.clear()
+
+      this.options.forEach(option => {
+        const wrapper = document.createElement('label')
+        wrapper.className = 'multi-select__option form-check align-items-center'
+        wrapper.dataset.value = option.value
+
+        const checkbox = document.createElement('input')
+        checkbox.type = 'checkbox'
+        checkbox.className = 'form-check-input'
+        checkbox.value = option.value
+        checkbox.checked = this.selectedValues.has(option.value)
+
+        const label = document.createElement('span')
+        label.className = 'form-check-label'
+        label.textContent = option.label
+
+        wrapper.append(checkbox, label)
+        this.optionsContainer.appendChild(wrapper)
+
+        this.optionItems.set(option.value, {
+          element: wrapper,
+          checkbox,
+          searchText: `${option.label}`.toLowerCase()
+        })
+      })
+
+      this.applyFilter(this.searchInput.value)
+    }
+
+    updateSummary() {
+      const values = Array.from(this.selectedValues)
+      if (values.length === 0) {
+        this.summary.textContent = this.placeholder
+        this.summary.classList.add('placeholder')
+        this.tags.hidden = true
+        this.tags.innerHTML = ''
+        return
+      }
+
+      this.summary.textContent = ''
+      this.summary.classList.remove('placeholder')
+      this.tags.hidden = false
+      this.tags.innerHTML = ''
+
+      const visibleCount = 2
+      values.slice(0, visibleCount).forEach(value => {
+        const badge = document.createElement('span')
+        badge.className = 'multi-select__tag badge text-bg-primary-subtle text-primary-emphasis'
+        badge.textContent = this.optionLookup.get(value) ?? value
+        this.tags.appendChild(badge)
+      })
+
+      if (values.length > visibleCount) {
+        const remainder = document.createElement('span')
+        remainder.className = 'multi-select__tag badge text-bg-light border text-secondary'
+        remainder.textContent = `+${values.length - visibleCount} more`
+        this.tags.appendChild(remainder)
+      }
+    }
+
+    updateActionStates() {
+      const totalOptions = this.options.length
+      const selectedCount = this.selectedValues.size
+      this.clearButton.disabled = selectedCount === 0
+      if (this.showSelectAll) {
+        this.selectAllButton.disabled = totalOptions === 0 || selectedCount === totalOptions
+      }
+    }
+
+    toggleValue(value, isSelected, { silent = false } = {}) {
+      if (!this.optionLookup.has(value)) {
+        return
+      }
+
+      if (isSelected) {
+        this.selectedValues.add(value)
+      } else {
+        this.selectedValues.delete(value)
+      }
+
+      const optionItem = this.optionItems.get(value)
+      if (optionItem) {
+        optionItem.checkbox.checked = isSelected
+      }
+
+      this.updateSelectElement()
+      this.updateSummary()
+      this.updateActionStates()
+
+      if (!silent) {
+        this.emitChange()
+      }
+    }
+
+    updateSelectElement() {
+      const selected = new Set(this.selectedValues)
+      Array.from(this.select.options).forEach(option => {
+        option.selected = selected.has(option.value)
+      })
+    }
+
+    emitChange() {
+      const event = new Event('change', { bubbles: true })
+      this.select.dispatchEvent(event)
+    }
+
+    setSelected(values, { silent = false } = {}) {
+      const normalizedValues = Array.from(new Set(values.filter(value => this.optionLookup.has(value))))
+      this.selectedValues = new Set(normalizedValues)
+
+      this.optionItems.forEach((item, value) => {
+        item.checkbox.checked = this.selectedValues.has(value)
+      })
+
+      this.updateSelectElement()
+      this.updateSummary()
+      this.updateActionStates()
+
+      if (!silent) {
+        this.emitChange()
+      }
+    }
+
+    getSelectedValues() {
+      return Array.from(this.selectedValues)
+    }
+
+    clear(silent = false) {
+      if (this.selectedValues.size === 0) {
+        return
+      }
+
+      this.selectedValues.clear()
+      this.optionItems.forEach(item => {
+        item.checkbox.checked = false
+      })
+      this.updateSelectElement()
+      this.updateSummary()
+      this.updateActionStates()
+
+      if (!silent) {
+        this.emitChange()
+      }
+    }
+
+    selectAll(silent = false) {
+      if (this.options.length === 0) {
+        return
+      }
+
+      const values = this.options.map(option => option.value)
+      this.selectedValues = new Set(values)
+      this.optionItems.forEach(item => {
+        item.checkbox.checked = true
+      })
+      this.updateSelectElement()
+      this.updateSummary()
+      this.updateActionStates()
+
+      if (!silent) {
+        this.emitChange()
+      }
+    }
+
+    setDisabled(nextState) {
+      this.disabled = Boolean(nextState)
+      this.control.disabled = this.disabled
+      this.container.classList.toggle('is-disabled', this.disabled)
+      if (this.disabled) {
+        this.close()
+      }
+    }
+  }
+
+  const registerMultiSelect = (element, options) => {
+    if (!element) {
+      return null
+    }
+
+    const controller = new DropdownMultiSelect(element, options)
+    multiSelectControllers.set(element.id, controller)
+    return controller
+  }
+
+  const getMultiSelect = element => {
+    if (!element || !element.id) {
+      return null
+    }
+    return multiSelectControllers.get(element.id) ?? null
+  }
+
+  const getSelectedValues = element => {
+    const controller = getMultiSelect(element)
+    if (controller) {
+      return controller.getSelectedValues()
+    }
+
+    if (!element) {
+      return []
+    }
+
+    if (element.multiple) {
+      return Array.from(element.selectedOptions || []).map(option => option.value).filter(value => value !== '')
+    }
+
+    return element.value ? [element.value] : []
+  }
+
+  const setMultiSelectPlaceholder = (element, placeholder) => {
+    const controller = getMultiSelect(element)
+    if (controller) {
+      controller.setPlaceholder(placeholder)
+    } else if (element) {
+      element.dataset.placeholder = placeholder
+    }
+  }
+
+  const setMultiSelectDisabled = (element, disabled) => {
+    const controller = getMultiSelect(element)
+    if (controller) {
+      controller.setDisabled(disabled)
+    } else if (element) {
+      element.disabled = Boolean(disabled)
+    }
+  }
+
+  const clearMultiSelect = element => {
+    const controller = getMultiSelect(element)
+    if (controller) {
+      controller.clear(true)
+    } else if (element) {
+      if (element.multiple) {
+        Array.from(element.options).forEach(option => {
+          option.selected = false
+        })
+      } else {
+        element.value = ''
+      }
+    }
+  }
+
   const formatNumber = (value, fractionDigits = 2) => {
     if (value === null || value === undefined || Number.isNaN(value)) {
       return '--'
@@ -358,14 +925,14 @@
 
   const collectFilters = () => {
     return {
-      product_line: productLineSelect.value || '',
-      project: projectSelect.value || '',
-      test_report_csv_name: testReportSelect?.value || '',
-      standard: standardSelect.value || '',
-      band: bandSelect.value || '',
-      bandwidth_mhz: bandwidthSelect.value || '',
+      product_line: getSelectedValues(productLineSelect),
+      project: getSelectedValues(projectSelect),
+      test_report_csv_name: testReportSelect ? getSelectedValues(testReportSelect) : [],
+      standard: getSelectedValues(standardSelect),
+      band: getSelectedValues(bandSelect),
+      bandwidth_mhz: getSelectedValues(bandwidthSelect),
       device_type: deviceTypeSelect.value || '',
-      device_value: deviceValueSelect.value || '',
+      device_value: getSelectedValues(deviceValueSelect),
       start_date: startDateInput.value || '',
       end_date: endDateInput.value || '',
       limit: DEFAULT_LIMIT
@@ -375,15 +942,54 @@
   const buildQueryString = filters => {
     const params = new URLSearchParams()
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && `${value}`.trim() !== '') {
+      if (Array.isArray(value)) {
+        value
+          .map(item => `${item}`.trim())
+          .filter(item => item.length > 0)
+          .forEach(item => {
+            params.append(key, item)
+          })
+      } else if (value !== undefined && value !== null && `${value}`.trim() !== '') {
         params.set(key, value)
       }
     })
     return params.toString()
   }
 
-  const populateSelect = (element, values, placeholder, selectedValue, formatLabel = value => value) => {
-    const previousValue = selectedValue ?? element.value
+  const populateSelect = (element, values, placeholder, formatLabel = value => value) => {
+    if (!element) {
+      return
+    }
+
+    const controller = getMultiSelect(element)
+    const normalizedOptions = (values ?? [])
+      .map(value => {
+        if (value && typeof value === 'object' && 'value' in value) {
+          const label = value.label ?? (formatLabel ? formatLabel(value.value) : value.value)
+          return { value: `${value.value}`, label: label ?? `${value.value}` }
+        }
+
+        const optionLabel = formatLabel ? formatLabel(value) : value
+        const resolvedLabel = optionLabel === undefined || optionLabel === null ? value : optionLabel
+        return { value: `${value}`, label: `${resolvedLabel}` }
+      })
+      .filter(option => {
+        if (option.value === undefined || option.value === null) {
+          return false
+        }
+        return `${option.value}`.trim().length > 0
+      })
+
+    if (controller) {
+      controller.setPlaceholder(placeholder)
+      controller.setOptions(normalizedOptions)
+      return
+    }
+
+    const previousValues = element.multiple
+      ? Array.from(element.selectedOptions || []).map(option => option.value)
+      : [element.value]
+
     element.innerHTML = ''
 
     const placeholderOption = document.createElement('option')
@@ -391,68 +997,60 @@
     placeholderOption.textContent = placeholder
     element.appendChild(placeholderOption)
 
-    values.forEach(value => {
-      const option = document.createElement('option')
-      option.value = value
-      const label = formatLabel ? formatLabel(value) : value
-      option.textContent = label ?? value
-      element.appendChild(option)
+    normalizedOptions.forEach(option => {
+      const optionElement = document.createElement('option')
+      optionElement.value = option.value
+      optionElement.textContent = option.label
+      element.appendChild(optionElement)
     })
 
-    if (previousValue && values.includes(previousValue)) {
-      element.value = previousValue
+    if (element.multiple) {
+      const validValues = new Set(normalizedOptions.map(option => option.value))
+      Array.from(element.options).forEach(option => {
+        option.selected = validValues.has(option.value) && previousValues.includes(option.value)
+      })
     } else {
-      element.value = ''
+      const selectedValue = previousValues.find(value => normalizedOptions.some(option => option.value === value))
+      element.value = selectedValue ?? ''
     }
   }
 
   const populateBandwidthSelect = (values, placeholder) => {
-    const numericValues = values
+    const numericValues = (values ?? [])
       .map(value => Number(value))
       .filter(value => Number.isFinite(value))
       .sort((a, b) => a - b)
 
     const formatted = numericValues.map(value => ({
-      label: `${value} MHz`,
-      value: value.toString()
+      value: value.toString(),
+      label: `${value} MHz`
     }))
 
-    const previousValue = bandwidthSelect.value
-    bandwidthSelect.innerHTML = ''
-
-    const placeholderOption = document.createElement('option')
-    placeholderOption.value = ''
-    placeholderOption.textContent = placeholder
-    bandwidthSelect.appendChild(placeholderOption)
-
-    formatted.forEach(item => {
-      const option = document.createElement('option')
-      option.value = item.value
-      option.textContent = item.label
-      bandwidthSelect.appendChild(option)
-    })
-
-    if (formatted.some(item => item.value === previousValue)) {
-      bandwidthSelect.value = previousValue
-    } else {
-      bandwidthSelect.value = ''
-    }
+    populateSelect(bandwidthSelect, formatted, placeholder)
   }
 
   const refreshDeviceValueOptions = deviceOptions => {
     const deviceType = deviceTypeSelect.value
     const resolvedOptions = deviceOptions ?? cachedFilterOptions?.devices ?? {}
     const options = resolvedOptions[deviceType] ?? []
-    deviceValueSelect.disabled = deviceType === ''
-    populateSelect(
-      deviceValueSelect,
-      options,
-      deviceType === '' ? 'Select a device field first' : 'All Devices',
-      deviceValueSelect.value
-    )
+    const placeholder = deviceType === '' ? 'Select a device field first' : 'All Device Values'
+
+    setMultiSelectPlaceholder(deviceValueSelect, placeholder)
+
     if (deviceType === '') {
-      deviceValueSelect.value = ''
+      setMultiSelectDisabled(deviceValueSelect, true)
+      clearMultiSelect(deviceValueSelect)
+      const controller = getMultiSelect(deviceValueSelect)
+      if (controller) {
+        controller.setOptions([], { preserveSelection: false })
+      } else {
+        populateSelect(deviceValueSelect, [], placeholder)
+      }
+      return
     }
+
+    setMultiSelectDisabled(deviceValueSelect, false)
+    populateSelect(deviceValueSelect, options, placeholder)
   }
 
   const fetchFilters = async () => {
@@ -928,7 +1526,6 @@
           bandSelect,
           filterOptions.bands,
           'All Bands',
-          undefined,
           value => formatBand(value) || value
         )
         populateBandwidthSelect(filterOptions.bandwidths ?? [], 'All Bandwidths')
@@ -963,19 +1560,25 @@
         updateCharts([])
         latestDataset = []
       }
+      isSyncingFilters = false
     } finally {
+      isSyncingFilters = false
       setLoadingState(false)
     }
   }
 
   const handleFormSubmit = async event => {
     event.preventDefault()
-    await loadFiltersAndData({ refreshFilters: true, refreshData: true })
+    await loadFiltersAndData({ refreshFilters: false, refreshData: true })
   }
 
   const handleFormReset = () => {
     window.setTimeout(() => {
-      deviceValueSelect.disabled = true
+      multiSelectControllers.forEach(controller => {
+        controller.clear(true)
+      })
+      setMultiSelectPlaceholder(deviceValueSelect, 'Select a device field first')
+      setMultiSelectDisabled(deviceValueSelect, true)
       loadFiltersAndData({ refreshFilters: true, refreshData: false, initial: true })
     }, 0)
   }
@@ -1002,6 +1605,20 @@
       console.warn('Filter form not found. wifi-dashboard.js was not initialized.')
       return
     }
+
+    registerMultiSelect(productLineSelect, { placeholder: 'All Product Lines' })
+    registerMultiSelect(projectSelect, { placeholder: 'All Projects' })
+    if (testReportSelect) {
+      registerMultiSelect(testReportSelect, { placeholder: 'All Test Reports' })
+    }
+    registerMultiSelect(standardSelect, { placeholder: 'All Standards' })
+    registerMultiSelect(bandSelect, { placeholder: 'All Bands' })
+    registerMultiSelect(bandwidthSelect, { placeholder: 'All Bandwidths' })
+    registerMultiSelect(deviceValueSelect, {
+      placeholder: 'Select a device field first',
+      showSelectAll: true
+    })
+    setMultiSelectDisabled(deviceValueSelect, true)
 
     form.addEventListener('submit', handleFormSubmit)
     form.addEventListener('reset', handleFormReset)
