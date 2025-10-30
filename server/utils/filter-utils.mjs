@@ -161,3 +161,62 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
 }
 
 export const allowedDeviceOptions = [...allowedDeviceColumns]
+
+export const buildTestReportConditions = (filters, { exclude = [] } = {}) => {
+  const conditions = []
+  const params = []
+  let requiresPerformanceJoin = false
+
+  if (!exclude.includes('productLine') && filters.productLine) {
+    conditions.push('d.product_line = ?')
+    params.push(filters.productLine)
+  }
+
+  if (!exclude.includes('project') && filters.project) {
+    conditions.push('d.project = ?')
+    params.push(filters.project)
+  }
+
+  if (!exclude.includes('device') && filters.deviceColumn && filters.deviceValue) {
+    conditions.push(`d.${filters.deviceColumn} = ?`)
+    params.push(filters.deviceValue)
+  }
+
+  if (!exclude.includes('standard') && filters.standard) {
+    conditions.push('p.standard = ?')
+    params.push(filters.standard)
+    requiresPerformanceJoin = true
+  }
+
+  if (!exclude.includes('band') && filters.band) {
+    conditions.push('p.band = ?')
+    params.push(filters.band)
+    requiresPerformanceJoin = true
+  }
+
+  if (!exclude.includes('bandwidth') && filters.bandwidthMhz !== null) {
+    conditions.push('p.bandwidth_mhz = ?')
+    params.push(filters.bandwidthMhz)
+    requiresPerformanceJoin = true
+  }
+
+  if (!exclude.includes('testReport') && filters.testReportCsvName) {
+    conditions.push('tr.csv_name = ?')
+    params.push(filters.testReportCsvName)
+  }
+
+  if (!exclude.includes('startDate') && filters.startDate) {
+    conditions.push('p.created_at >= ?')
+    params.push(filters.startDate)
+    requiresPerformanceJoin = true
+  }
+
+  if (!exclude.includes('endDate') && filters.endDate) {
+    conditions.push('p.created_at <= ?')
+    params.push(filters.endDate)
+    requiresPerformanceJoin = true
+  }
+
+  return { conditions, params, requiresPerformanceJoin }
+}
+

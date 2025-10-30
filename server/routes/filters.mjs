@@ -1,6 +1,12 @@
 import { Router } from 'express'
 import pool from '../db.mjs'
-import { allowedDeviceOptions, buildDutConditions, buildPerformanceConditions, normalizeFilters } from '../utils/filter-utils.mjs'
+import {
+  allowedDeviceOptions,
+  buildDutConditions,
+  buildPerformanceConditions,
+  buildTestReportConditions,
+  normalizeFilters
+} from '../utils/filter-utils.mjs'
 
 const router = Router()
 
@@ -76,12 +82,18 @@ router.get('/', async (req, res, next) => {
       bandwidthQuery += ' ORDER BY p.bandwidth_mhz'
       const [bandwidths] = await connection.query(bandwidthQuery, bandwidthFilter.params)
 
-      const testReportFilter = buildPerformanceConditions(filters, { exclude: ['testReport'], includeBase: false })
+      const testReportFilter = buildTestReportConditions(filters, { exclude: ['testReport'] })
       let testReportQuery = `
         SELECT DISTINCT tr.csv_name AS value
-        FROM performance p
-        INNER JOIN test_report tr ON tr.id = p.test_report_id
+        FROM test_report tr
         INNER JOIN dut d ON d.id = tr.dut_id
+      `
+      if (testReportFilter.requiresPerformanceJoin) {
+        testReportQuery += `
+          INNER JOIN performance p ON p.test_report_id = tr.id
+        `
+      }
+      testReportQuery += `
         WHERE tr.csv_name IS NOT NULL
       `
       if (testReportFilter.conditions.length > 0) {
