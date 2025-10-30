@@ -198,11 +198,6 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
     addConditionForValues(conditions, params, 'tr.csv_name', filters.testReportCsvNames)
   }
 
-  if (!exclude.includes('testReport') && filters.testReportCsvName) {
-    conditions.push('tr.csv_name = ?')
-    params.push(filters.testReportCsvName)
-  }
-
   if (!exclude.includes('startDate') && filters.startDate) {
     conditions.push('p.created_at >= ?')
     params.push(filters.startDate)
