@@ -16,6 +16,7 @@
   const form = document.getElementById('filtersForm')
   const productLineSelect = document.getElementById('filterProductLine')
   const projectSelect = document.getElementById('filterProject')
+  const testReportSelect = document.getElementById('filterTestReport')
   const standardSelect = document.getElementById('filterStandard')
   const bandSelect = document.getElementById('filterBand')
   const bandwidthSelect = document.getElementById('filterBandwidth')
@@ -28,25 +29,17 @@
   const exportButton = document.getElementById('exportButton')
   const DIRECTION_SETTINGS = {
     uplink: {
-      label: 'Tx (Uplink)',
-      canvasId: 'performanceChartTx',
-      emptyStateId: 'chartEmptyStateTx'
+      label: 'Tx (Uplink)'
     },
     downlink: {
-      label: 'Rx (Downlink)',
-      canvasId: 'performanceChartRx',
-      emptyStateId: 'chartEmptyStateRx'
+      label: 'Rx (Downlink)'
     }
   }
   const ORDERED_DIRECTIONS = ['uplink', 'downlink']
-  const chartInstances = {}
-  const chartEmptyStates = Object.fromEntries(
-    ORDERED_DIRECTIONS.map(direction => [
-      direction,
-      document.getElementById(DIRECTION_SETTINGS[direction].emptyStateId)
-    ])
-  )
-
+  const chartGroupsContainer = document.getElementById('performanceChartGroups')
+  const scenarioSections = new Map()
+  const chartInstances = new Map()
+  const chartEmptyStates = new Map()
 
   let latestDataset = []
   let isLoading = false
@@ -69,7 +62,6 @@
     const date = new Date(value)
     return Number.isNaN(date.getTime()) ? '--' : date.toLocaleString()
   }
-
 
   const formatBand = value => {
     const raw = `${value ?? ''}`.trim()
@@ -297,6 +289,52 @@
     return parts.length > 0 ? parts.join(' ') : 'Unknown Test'
   }
 
+  const sanitizeScenarioKeyForId = value => {
+    const raw = `${value ?? ''}`
+    const sanitized = raw.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/-{2,}/g, '-').replace(/^-+|-+$/g, '')
+    return sanitized || 'scenario'
+  }
+
+  const resolveScenarioIdentity = item => {
+    const scenarioKey = item.scenarioGroupKey || item.casePath || 'scenario'
+    const labelParts = []
+
+    if (item.scenarioGroupKey) {
+      labelParts.push(item.scenarioGroupKey)
+    }
+
+    if (item.casePath && !labelParts.some(part => part.toLowerCase() === item.casePath.toLowerCase())) {
+      labelParts.push(item.casePath)
+    }
+
+    const channel = deriveChannelFromFrequency(item.centerFreqMhz)
+    if (
+      channel !== null &&
+      !labelParts.some(part => part.toLowerCase().includes(`ch ${channel}`.toLowerCase())) &&
+      !labelParts.some(part => part.toLowerCase().includes(`ch${channel}`.toLowerCase()))
+    ) {
+      labelParts.push(`CH ${channel}`)
+    }
+
+    if (labelParts.length === 0) {
+      labelParts.push('Scenario')
+    }
+
+    return {
+      key: scenarioKey,
+      label: labelParts.join(' • ')
+    }
+  }
+
+  const formatScenarioHeading = label => {
+    const resolved = `${label ?? ''}`.trim()
+    if (!resolved) {
+      return 'Scenario'
+    }
+
+    return resolved.toLowerCase().startsWith('scenario') ? resolved : `Scenario: ${resolved}`
+  }
+
   const COLOR_TOKEN_SETS = [
     { token: '--cui-primary', rgbToken: '--cui-primary-rgb', fallback: '#321fdb', fallbackRgb: '50,31,219' },
     { token: '--cui-info', rgbToken: '--cui-info-rgb', fallback: '#39f', fallbackRgb: '51,153,255' },
@@ -322,6 +360,7 @@
     return {
       product_line: productLineSelect.value || '',
       project: projectSelect.value || '',
+      test_report_csv_name: testReportSelect?.value || '',
       standard: standardSelect.value || '',
       band: bandSelect.value || '',
       bandwidth_mhz: bandwidthSelect.value || '',
@@ -439,19 +478,37 @@
     return response.json()
   }
 
-  const prepareDirectionalGroups = data => {
-    const groupsByDirection = {
-      uplink: new Map(),
-      downlink: new Map()
-    }
+  const prepareScenarioGroups = data => {
+    const scenarios = new Map()
 
     data.forEach(item => {
       const direction = normalizeDirection(item.direction)
-      const bucket = direction ? groupsByDirection[direction] : undefined
-      if (!bucket || !Number.isFinite(item.pathLossDb) || !Number.isFinite(item.throughputAvgMbps)) {
+      if (!direction || !Number.isFinite(item.pathLossDb) || !Number.isFinite(item.throughputAvgMbps)) {
         return
       }
 
+      const identity = resolveScenarioIdentity(item)
+      const scenarioKey = identity.key || 'scenario'
+      if (!scenarios.has(scenarioKey)) {
+        scenarios.set(scenarioKey, {
+          key: scenarioKey,
+          label: identity.label || 'Scenario',
+          directions: {
+            uplink: new Map(),
+            downlink: new Map()
+          }
+        })
+      }
+
+      const scenarioEntry = scenarios.get(scenarioKey)
+      if (identity.label && identity.label !== scenarioEntry.label) {
+        const shouldReplace = scenarioEntry.label === 'Scenario' || identity.label.length > scenarioEntry.label.length
+        if (shouldReplace) {
+          scenarioEntry.label = identity.label
+        }
+      }
+
+      const bucket = scenarioEntry.directions[direction]
       const seriesKey = buildSeriesKey(item)
       if (!seriesKey) {
         return
@@ -481,26 +538,112 @@
       })
     })
 
-    return Object.fromEntries(
-      ORDERED_DIRECTIONS.map(direction => [
-        direction,
-        Array.from(groupsByDirection[direction].values()).map(group => ({
-          label: group.label,
-          points: group.points.sort((a, b) => a.x - b.x)
-        }))
-      ])
-    )
+    return Array.from(scenarios.values()).map(scenario => ({
+      key: scenario.key,
+      label: scenario.label,
+      directions: Object.fromEntries(
+        ORDERED_DIRECTIONS.map(direction => [
+          direction,
+          Array.from(scenario.directions[direction].values()).map(group => ({
+            label: group.label,
+            points: group.points.sort((a, b) => a.x - b.x)
+          }))
+        ])
+      )
+    }))
   }
 
-  const ensureChartInstance = direction => {
-    if (chartInstances[direction]) {
-      return chartInstances[direction]
+  const ensureScenarioSection = (scenarioKey, scenarioLabel) => {
+    if (!chartGroupsContainer) {
+      return null
     }
 
-    const config = DIRECTION_SETTINGS[direction]
-    const canvas = document.getElementById(config.canvasId)
+    const headingText = formatScenarioHeading(scenarioLabel)
+    const existing = scenarioSections.get(scenarioKey)
+    if (existing) {
+      if (existing.titleElement && existing.titleElement.textContent !== headingText) {
+        existing.titleElement.textContent = headingText
+      }
+      return existing
+    }
+
+    const section = document.createElement('section')
+    section.className = 'chart-scenario d-flex flex-column gap-3'
+    section.dataset.scenarioKey = scenarioKey
+
+    const title = document.createElement('h6')
+    title.className = 'fw-semibold mb-2'
+    title.textContent = headingText
+    section.appendChild(title)
+
+    const directionBlocks = {}
+
+    ORDERED_DIRECTIONS.forEach(direction => {
+      const directionSection = document.createElement('div')
+      directionSection.className = 'chart-section'
+
+      const directionTitle = document.createElement('h6')
+      directionTitle.className = 'fw-semibold mb-3'
+      directionTitle.textContent = DIRECTION_SETTINGS[direction].label
+      directionSection.appendChild(directionTitle)
+
+      const container = document.createElement('div')
+      container.className = 'chart-container position-relative'
+      container.style.minHeight = '320px'
+
+      const canvas = document.createElement('canvas')
+      canvas.style.minHeight = '320px'
+      canvas.style.width = '100%'
+      canvas.id = `performanceChart-${sanitizeScenarioKeyForId(scenarioKey)}-${direction}`
+      container.appendChild(canvas)
+
+      const emptyState = document.createElement('div')
+      emptyState.className = 'chart-empty-state fw-semibold position-absolute top-50 start-50 translate-middle text-center'
+      emptyState.style.display = 'none'
+      emptyState.textContent = `No data for ${DIRECTION_SETTINGS[direction].label}. Adjust the filters and try again.`
+      container.appendChild(emptyState)
+
+      directionSection.appendChild(container)
+      section.appendChild(directionSection)
+
+      directionBlocks[direction] = {
+        headingElement: directionTitle,
+        canvas,
+        emptyState
+      }
+    })
+
+    chartGroupsContainer.appendChild(section)
+
+    const record = { section, titleElement: title, directionBlocks }
+    scenarioSections.set(scenarioKey, record)
+    chartEmptyStates.set(
+      scenarioKey,
+      Object.fromEntries(
+        ORDERED_DIRECTIONS.map(direction => [direction, directionBlocks[direction].emptyState])
+      )
+    )
+    return record
+  }
+
+  const ensureDirectionalChart = (scenarioKey, scenarioLabel, direction) => {
+    const section = ensureScenarioSection(scenarioKey, scenarioLabel)
+    if (!section) {
+      return null
+    }
+
+    let scenarioCharts = chartInstances.get(scenarioKey)
+    if (!scenarioCharts) {
+      scenarioCharts = {}
+      chartInstances.set(scenarioKey, scenarioCharts)
+    }
+
+    if (scenarioCharts[direction]) {
+      return scenarioCharts[direction]
+    }
+
+    const canvas = section.directionBlocks[direction]?.canvas
     if (!canvas) {
-      console.warn(`Canvas element ${config.canvasId} not found. Unable to initialize chart.`)
       return null
     }
 
@@ -602,12 +745,12 @@
       chart.update()
     })
 
-    chartInstances[direction] = chart
+    scenarioCharts[direction] = chart
     return chart
   }
 
-  const updateDirectionalChart = (direction, groups) => {
-    const chart = ensureChartInstance(direction)
+  const updateDirectionalChart = (scenarioKey, scenarioLabel, direction, groups) => {
+    const chart = ensureDirectionalChart(scenarioKey, scenarioLabel, direction)
     if (!chart) {
       return
     }
@@ -624,7 +767,7 @@
       const points = group.points.map(point => ({
         ...point,
         band: formatBand(point.band) || point.band,
-        scenarioLabel: group.label,
+        scenarioLabel: scenarioLabel || group.label,
         directionLabel
       }))
 
@@ -655,22 +798,59 @@
       chart.resize()
     })
 
-    const emptyState = chartEmptyStates[direction]
+    const emptyState = chartEmptyStates.get(scenarioKey)?.[direction]
     if (emptyState) {
       emptyState.style.display = datasets.length === 0 ? 'block' : 'none'
     }
   }
 
+  const removeScenarioCharts = scenarioKey => {
+    const charts = chartInstances.get(scenarioKey)
+    if (charts) {
+      ORDERED_DIRECTIONS.forEach(direction => {
+        charts[direction]?.destroy()
+      })
+      chartInstances.delete(scenarioKey)
+    }
+
+    const section = scenarioSections.get(scenarioKey)
+    if (section) {
+      section.section.remove()
+      scenarioSections.delete(scenarioKey)
+    }
+
+    chartEmptyStates.delete(scenarioKey)
+  }
+
   const updateCharts = data => {
-    const grouped = prepareDirectionalGroups(data)
-    ORDERED_DIRECTIONS.forEach(direction => {
-      updateDirectionalChart(direction, grouped[direction] ?? [])
+    const scenarios = prepareScenarioGroups(data)
+    const activeKeys = new Set(scenarios.map(item => item.key))
+
+    const knownKeys = new Set([...chartInstances.keys(), ...scenarioSections.keys()])
+    knownKeys.forEach(key => {
+      if (!activeKeys.has(key)) {
+        removeScenarioCharts(key)
+      }
     })
 
-    const hasPoints = ORDERED_DIRECTIONS.some(direction => {
-      const groups = grouped[direction] ?? []
-      return groups.some(group => group.points.length > 0)
+    scenarios.forEach(scenario => {
+      const record = ensureScenarioSection(scenario.key, scenario.label)
+      if (!record) {
+        return
+      }
+
+      chartGroupsContainer.appendChild(record.section)
+
+      ORDERED_DIRECTIONS.forEach(direction => {
+        updateDirectionalChart(scenario.key, scenario.label, direction, scenario.directions[direction] ?? [])
+      })
     })
+
+    const hasPoints = scenarios.some(scenario =>
+      ORDERED_DIRECTIONS.some(direction =>
+        (scenario.directions[direction] ?? []).some(group => group.points.length > 0)
+      )
+    )
     exportButton.disabled = !hasPoints
   }
 
@@ -740,6 +920,9 @@
         isSyncingFilters = true
         populateSelect(productLineSelect, filterOptions.productLines, 'All Product Lines')
         populateSelect(projectSelect, filterOptions.projects, 'All Projects')
+        if (testReportSelect) {
+          populateSelect(testReportSelect, filterOptions.testReports ?? [], 'All Test Reports')
+        }
         populateSelect(standardSelect, filterOptions.standards, 'All Standards')
         populateSelect(
           bandSelect,
@@ -829,6 +1012,7 @@
     deviceTypeSelect.addEventListener('change', handleDeviceTypeChange)
     productLineSelect.addEventListener('change', handleCriteriaChange)
     projectSelect.addEventListener('change', handleCriteriaChange)
+    testReportSelect?.addEventListener('change', handleCriteriaChange)
 
     loadFiltersAndData({ refreshFilters: true, refreshData: false, initial: true })
   }
