@@ -37,14 +37,161 @@
   }
   const ORDERED_DIRECTIONS = ['uplink', 'downlink']
   const chartGroupsContainer = document.getElementById('performanceChartGroups')
+  const dataTypeTabs = document.getElementById('performanceDataTypeTabs')
+  const metricCards = document.getElementById('metricCards')
+  const slaPassRateEl = document.getElementById('slaPassRate')
+  const slaPassTrendEl = document.getElementById('slaPassTrend')
+  const slaPassChangeEl = document.getElementById('slaPassChange')
+  const lastUpdatedEl = document.getElementById('lastUpdated')
   const scenarioSections = new Map()
   const chartInstances = new Map()
   const chartEmptyStates = new Map()
+  const polarCharts = { uplink: null, downlink: null }
+
+  const DATA_TYPE_OPTIONS = [
+    { value: 'PEAK_THROUGHPUT', label: 'Peak Throughput' },
+    { value: 'RVR', label: 'RVR' },
+    { value: 'RVO', label: 'RVO' }
+  ]
+  let selectedDataType = 'PEAK_THROUGHPUT'
 
   let latestDataset = []
   let isLoading = false
   let cachedFilterOptions = null
   let isSyncingFilters = false
+
+  const WEEKLY_TESTS_ENDPOINT = window.WIFI_WEEKLY_TESTS_ENDPOINT ?? `${API_BASE}/weekly-tests-summary`
+
+  const formatDuration = totalMinutes => {
+    if (totalMinutes === null || totalMinutes === undefined || Number.isNaN(Number(totalMinutes))) return null
+    const minutes = Math.max(0, Math.round(Number(totalMinutes)))
+    const hours = Math.floor(minutes / 60)
+    const remaining = minutes % 60
+    if (hours > 0) return `${hours}h ${remaining}m`
+    return `${minutes}m`
+  }
+
+  const fetchJson = async url => {
+    const response = await fetch(url)
+    if (!response.ok) {
+      const error = new Error(`Request failed (${response.status})`)
+      throw error
+    }
+    return response.json()
+  }
+
+  const buildMetricCard = ({ gradient, icon, label, value, trendIcon, trendText }) => {
+    const trendMarkup = trendText
+      ? `<div class="metric-trend">${trendIcon ? `<svg class="icon"><use xlink:href="${trendIcon}"></use></svg>` : ''}${trendText}</div>`
+      : ''
+    return `
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="metric-card ${gradient} h-100">
+          <div class="metric-icon">
+            <svg class="icon">
+              <use xlink:href="${icon}"></use>
+            </svg>
+          </div>
+          <div class="metric-label">${label}</div>
+          <div class="metric-value">${value}</div>
+          ${trendMarkup}
+        </div>
+      </div>
+    `.trim()
+  }
+
+  const renderWeeklyTestCards = payload => {
+    if (!metricCards) return
+    const data = payload ?? window.WIFI_WEEKLY_TESTS ?? {}
+
+    const totalCount = Number.isFinite(Number(data.weekTestCount)) ? Number(data.weekTestCount) : null
+    const durationText = formatDuration(data.weekTotalDurationMinutes ?? data.weekTotalDurationMins ?? null)
+    const longestProject = data.longestTest?.projectName ?? null
+    const longestName = data.longestTest?.testName ?? data.longestTest?.testContent ?? null
+    const longestDuration = formatDuration(data.longestTest?.durationMinutes ?? data.longestTest?.durationMins ?? null)
+
+    const cards = []
+    cards.push(buildMetricCard({
+      gradient: 'gradient-amber',
+      icon: 'node_modules/@coreui/icons/sprites/free.svg#cil-layers',
+      label: 'Weekly Tests (Count)',
+      value: totalCount !== null ? `${totalCount} runs` : 'N/A',
+      trendIcon: '',
+      trendText: ''
+    }))
+
+    cards.push(buildMetricCard({
+      gradient: 'gradient-indigo',
+      icon: 'node_modules/@coreui/icons/sprites/free.svg#cil-clock',
+      label: 'Weekly Tests (Total Duration)',
+      value: durationText || 'N/A',
+      trendIcon: '',
+      trendText: ''
+    }))
+
+    const detailParts = [longestProject, longestName].filter(Boolean)
+    const detailText = detailParts.join(' · ')
+    cards.push(buildMetricCard({
+      gradient: 'gradient-emerald',
+      icon: 'node_modules/@coreui/icons/sprites/free.svg#cil-chart-line',
+      label: 'Longest Test (Project / Content)',
+      value: detailText || 'N/A',
+      trendIcon: '',
+      trendText: ''
+    }))
+
+    cards.push(buildMetricCard({
+      gradient: 'gradient-pink',
+      icon: 'node_modules/@coreui/icons/sprites/free.svg#cil-timer',
+      label: 'Longest Test (Duration)',
+      value: longestDuration || 'N/A',
+      trendIcon: '',
+      trendText: ''
+    }))
+
+    metricCards.innerHTML = cards.join('')
+  }
+
+  const renderHeroStats = payload => {
+    const data = payload ?? null
+    const passRate = data?.slaPassRate ?? data?.sla_pass_rate ?? null
+    const passChange = data?.slaChangePercent ?? data?.sla_change_percent ?? null
+    const lastUpdated = data?.lastUpdated ?? data?.last_updated ?? null
+
+    if (slaPassRateEl) {
+      slaPassRateEl.textContent = passRate === null || passRate === undefined ? 'N/A' : `${passRate}%`
+    }
+    if (slaPassChangeEl && slaPassTrendEl) {
+      if (passChange === null || passChange === undefined) {
+        slaPassTrendEl.classList.add('d-none')
+        slaPassChangeEl.textContent = 'N/A'
+      } else {
+        slaPassTrendEl.classList.remove('d-none')
+        slaPassChangeEl.textContent = `${passChange}%`
+      }
+    }
+    if (lastUpdatedEl) {
+      lastUpdatedEl.textContent = lastUpdated ?? 'N/A'
+    }
+  }
+
+  const loadWeeklyTests = () => {
+    if (!metricCards) return
+    if (window.WIFI_WEEKLY_TESTS) {
+      renderWeeklyTestCards(window.WIFI_WEEKLY_TESTS)
+      renderHeroStats(window.WIFI_WEEKLY_TESTS)
+      return
+    }
+    fetchJson(WEEKLY_TESTS_ENDPOINT)
+      .then(payload => {
+        renderWeeklyTestCards(payload)
+        renderHeroStats(payload)
+      })
+      .catch(() => {
+        renderWeeklyTestCards({})
+        renderHeroStats({})
+      })
+  }
 
   const multiSelectControllers = new Map()
 
@@ -831,29 +978,17 @@
   }
 
   const buildDatasetLabel = item => {
+    if (item.project) return item.project
     const parts = []
-
     if (item.band) {
       const bandLabel = formatBand(item.band) || item.band
-      if (bandLabel) {
-        parts.push(bandLabel)
-      }
+      if (bandLabel) parts.push(bandLabel)
     }
-
-    if (Number.isFinite(item.bandwidthMhz)) {
-      parts.push(`${item.bandwidthMhz}MHz`)
-    }
-
-    if (item.standard) {
-      parts.push(item.standard.toUpperCase())
-    }
-
+    if (Number.isFinite(item.bandwidthMhz)) parts.push(`${item.bandwidthMhz}MHz`)
+    if (item.standard) parts.push(item.standard.toUpperCase())
     const channel = deriveChannelFromFrequency(item.centerFreqMhz)
-    if (channel !== null) {
-      parts.push(`CH ${channel}`)
-    }
-
-    return parts.length > 0 ? parts.join(' ') : 'Unknown Test'
+    if (channel !== null) parts.push(`CH ${channel}`)
+    return parts.length > 0 ? parts.join(' ') : 'Unknown Project'
   }
 
   const sanitizeScenarioKeyForId = value => {
@@ -862,12 +997,30 @@
     return sanitized || 'scenario'
   }
 
+  const formatScenarioGroupKey = value => {
+    const raw = `${value ?? ''}`.trim()
+    if (!raw) return ''
+    const parts = raw.split('|').map(part => part.trim()).filter(Boolean)
+    const keepKeys = new Set(['BAND', 'BANDWIDTH', 'STANDARD', 'SSID', 'CHANNEL'])
+    const kept = parts
+      .map(part => part.split('=').map(token => token.trim()))
+      .filter(([key, val]) => key && val && keepKeys.has(key.toUpperCase()))
+      .map(([key, val]) => {
+        if (key.toUpperCase() === 'BANDWIDTH') return `BW=${val}`
+        return `${key.toUpperCase()}=${val}`
+      })
+    return kept.join(' • ')
+  }
+
   const resolveScenarioIdentity = item => {
     const scenarioKey = item.scenarioGroupKey || item.casePath || 'scenario'
     const labelParts = []
 
     if (item.scenarioGroupKey) {
-      labelParts.push(item.scenarioGroupKey)
+      const compact = formatScenarioGroupKey(item.scenarioGroupKey)
+      if (compact) {
+        labelParts.push(compact)
+      }
     }
 
     if (item.casePath && !labelParts.some(part => part.toLowerCase() === item.casePath.toLowerCase())) {
@@ -893,13 +1046,15 @@
     }
   }
 
+  
+
   const formatScenarioHeading = label => {
     const resolved = `${label ?? ''}`.trim()
     if (!resolved) {
       return 'Scenario'
     }
 
-    return resolved.toLowerCase().startsWith('scenario') ? resolved : `Scenario: ${resolved}`
+    return resolved
   }
 
   const COLOR_TOKEN_SETS = [
@@ -931,6 +1086,7 @@
       standard: getSelectedValues(standardSelect),
       band: getSelectedValues(bandSelect),
       bandwidth_mhz: getSelectedValues(bandwidthSelect),
+      data_type: selectedDataType,
       device_type: deviceTypeSelect.value || '',
       device_value: getSelectedValues(deviceValueSelect),
       start_date: startDateInput.value || '',
@@ -1355,12 +1511,12 @@
 
     const palette = getColorPalette()
     const directionLabel = DIRECTION_SETTINGS[direction].label
-    const datasets = groups.map((group, index) => {
-      const colors = palette[index % palette.length] ?? {
-        border: '#321fdb',
-        point: '#321fdb',
-        fill: 'rgba(50,31,219,0.16)'
-      }
+      const datasets = groups.map((group, index) => {
+        const colors = palette[index % palette.length] ?? {
+          border: '#321fdb',
+          point: '#321fdb',
+          fill: 'rgba(50,31,219,0.16)'
+        }
 
       const points = group.points.map(point => ({
         ...point,
@@ -1414,10 +1570,188 @@
     const section = scenarioSections.get(scenarioKey)
     if (section) {
       section.section.remove()
-      scenarioSections.delete(scenarioKey)
+    scenarioSections.delete(scenarioKey)
+  }
+
+  chartEmptyStates.delete(scenarioKey)
+}
+
+  const clearAllCharts = () => {
+    const keys = Array.from(new Set([...chartInstances.keys(), ...scenarioSections.keys()]))
+    keys.forEach(key => removeScenarioCharts(key))
+
+    ORDERED_DIRECTIONS.forEach(direction => {
+      polarCharts[direction]?.destroy()
+      polarCharts[direction] = null
+    })
+
+    if (chartGroupsContainer) {
+      chartGroupsContainer.innerHTML = ''
+    }
+  }
+
+  const renderPeakTable = data => {
+    if (!chartGroupsContainer) {
+      return
     }
 
-    chartEmptyStates.delete(scenarioKey)
+    const rows = (data ?? [])
+      .filter(item => Number.isFinite(item.throughputAvgMbps))
+      .sort((a, b) => Number(b.throughputAvgMbps) - Number(a.throughputAvgMbps))
+      .slice(0, 20)
+
+    const table = document.createElement('table')
+    table.className = 'table table-sm align-middle mb-0'
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th>Project</th>
+          <th>Throughput (Mbps)</th>
+          <th>Band</th>
+          <th>Bandwidth</th>
+          <th>Standard</th>
+          <th>Direction</th>
+          <th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(item => `
+          <tr>
+            <td>${item.project ?? '-'}</td>
+            <td>${formatNumber(item.throughputAvgMbps)}</td>
+            <td>${formatBand(item.band) || item.band || '-'}</td>
+            <td>${Number.isFinite(item.bandwidthMhz) ? `${item.bandwidthMhz} MHz` : '-'}</td>
+            <td>${item.standard ?? '-'}</td>
+            <td>${DIRECTION_SETTINGS[normalizeDirection(item.direction)]?.label ?? '-'}</td>
+            <td>${item.createdAt ? formatDateTime(item.createdAt) : '-'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    `
+
+    chartGroupsContainer.innerHTML = ''
+    const wrapper = document.createElement('div')
+    wrapper.className = 'table-responsive'
+    wrapper.appendChild(table)
+    chartGroupsContainer.appendChild(wrapper)
+  }
+
+  const ensurePolarSection = () => {
+    if (!chartGroupsContainer) {
+      return null
+    }
+
+    if (chartGroupsContainer.querySelector('[data-polar-section="rvo"]')) {
+      return chartGroupsContainer.querySelector('[data-polar-section="rvo"]')
+    }
+
+    const section = document.createElement('div')
+    section.className = 'chart-scenario d-flex flex-column gap-3'
+    section.dataset.polarSection = 'rvo'
+
+    ORDERED_DIRECTIONS.forEach(direction => {
+      const directionSection = document.createElement('div')
+      directionSection.className = 'chart-section'
+
+      const directionTitle = document.createElement('h6')
+      directionTitle.className = 'fw-semibold mb-3'
+      directionTitle.textContent = `${DIRECTION_SETTINGS[direction].label} (Polar)`
+      directionSection.appendChild(directionTitle)
+
+      const container = document.createElement('div')
+      container.className = 'chart-container position-relative'
+      container.style.minHeight = '320px'
+
+      const canvas = document.createElement('canvas')
+      canvas.style.minHeight = '320px'
+      canvas.style.width = '100%'
+      canvas.id = `performancePolar-${direction}`
+      container.appendChild(canvas)
+
+      directionSection.appendChild(container)
+      section.appendChild(directionSection)
+
+      const chart = new Chart(canvas, {
+        type: 'radar',
+        data: { labels: [], datasets: [] },
+        options: {
+          maintainAspectRatio: false,
+          elements: {
+            line: { borderWidth: 2 },
+            point: { radius: 2 }
+          },
+          plugins: {
+            legend: { display: true, position: 'top' },
+            tooltip: {
+              callbacks: {
+                title: items => items?.[0]?.label ?? '',
+                label: context => `${context.dataset?.label ?? ''}: ${formatNumber(context.parsed?.r)} Mbps`
+              }
+            }
+          },
+          scales: {
+            r: {
+              beginAtZero: true,
+              ticks: { display: true },
+              title: { display: true, text: 'Throughput (Mbps)' }
+            }
+          }
+        }
+      })
+
+      polarCharts[direction] = chart
+    })
+
+    chartGroupsContainer.innerHTML = ''
+    chartGroupsContainer.appendChild(section)
+    return section
+  }
+
+  const updateRvoCharts = data => {
+    ensurePolarSection()
+    const palette = getColorPalette()
+    const toFill = color => {
+      if (!color) return 'rgba(50,31,219,0.15)'
+      if (color.startsWith('rgb(')) return color.replace('rgb(', 'rgba(').replace(')', ', 0.15)')
+      return color
+    }
+
+    ORDERED_DIRECTIONS.forEach(direction => {
+      const points = (data ?? [])
+        .filter(item => normalizeDirection(item.direction) === direction)
+        .filter(item => Number.isFinite(item.angleDeg) && Number.isFinite(item.throughputAvgMbps))
+
+      const angles = Array.from(new Set(points.map(item => Number(item.angleDeg)))).sort((a, b) => a - b)
+      const labels = angles.map(angle => `${formatNumber(angle, 0)}°`)
+
+      const projectGroups = new Map()
+      points.forEach(item => {
+        const key = item.project ?? 'Unknown Project'
+        if (!projectGroups.has(key)) {
+          projectGroups.set(key, new Map())
+        }
+        projectGroups.get(key).set(Number(item.angleDeg), item.throughputAvgMbps)
+      })
+
+      const datasets = Array.from(projectGroups.entries()).map(([project, map], index) => {
+        const color = palette[index % palette.length]?.border ?? '#321fdb'
+        const dataPoints = angles.map(angle => map.get(angle) ?? null)
+        return {
+          label: project,
+          data: dataPoints,
+          borderColor: color,
+          backgroundColor: toFill(color),
+          pointBackgroundColor: color,
+          fill: true
+        }
+      })
+
+      const chart = polarCharts[direction]
+      if (!chart) return
+      chart.data.labels = labels
+      chart.data.datasets = datasets
+      chart.update()
+    })
   }
 
   const updateCharts = data => {
@@ -1452,8 +1786,27 @@
     exportButton.disabled = !hasPoints
   }
 
+  const updateVisualization = data => {
+    if (selectedDataType === 'PEAK_THROUGHPUT') {
+      clearAllCharts()
+      renderPeakTable(data)
+      exportButton.disabled = !(data && data.length > 0)
+      return
+    }
+
+    if (selectedDataType === 'RVO') {
+      clearAllCharts()
+      updateRvoCharts(data)
+      exportButton.disabled = !(data && data.length > 0)
+      return
+    }
+
+    clearAllCharts()
+    updateCharts(data)
+  }
+
   document.documentElement.addEventListener('ColorSchemeChange', () => {
-    updateCharts(latestDataset)
+    updateVisualization(latestDataset)
   })
 
 
@@ -1536,7 +1889,7 @@
       if (refreshData) {
         const { data, metadata } = await fetchPerformanceData()
         latestDataset = data
-        updateCharts(data)
+        updateVisualization(data)
 
         if (data.length === 0) {
           setStatus('No data matched the current filters.')
@@ -1548,7 +1901,7 @@
         }
       } else if (initial) {
         latestDataset = []
-        updateCharts([])
+        updateVisualization([])
         setStatus(FILTER_PROMPT_MESSAGE)
       } else if (pendingStatus) {
         setStatus(pendingStatus)
@@ -1557,7 +1910,7 @@
       console.error(error)
       setStatus(error.message ?? 'An error occurred while loading data. Please try again later.')
       if (refreshData) {
-        updateCharts([])
+        updateVisualization([])
         latestDataset = []
       }
       isSyncingFilters = false
@@ -1631,9 +1984,25 @@
     projectSelect.addEventListener('change', handleCriteriaChange)
     testReportSelect?.addEventListener('change', handleCriteriaChange)
 
+    if (dataTypeTabs) {
+      dataTypeTabs.querySelectorAll('[data-performance-datatype]').forEach(button => {
+        button.addEventListener('click', () => {
+          const value = button.dataset.performanceDatatype
+          if (!value) return
+          selectedDataType = value
+          dataTypeTabs.querySelectorAll('[data-performance-datatype]').forEach(inner => {
+            const isActive = inner.dataset.performanceDatatype === selectedDataType
+            inner.classList.toggle('active', isActive)
+            inner.setAttribute('aria-selected', isActive ? 'true' : 'false')
+          })
+          loadFiltersAndData({ refreshFilters: false, refreshData: true })
+        })
+      })
+    }
+
+    loadWeeklyTests()
     loadFiltersAndData({ refreshFilters: true, refreshData: false, initial: true })
   }
 
   document.addEventListener('DOMContentLoaded', init)
 })()
-

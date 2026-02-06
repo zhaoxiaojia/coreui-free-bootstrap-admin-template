@@ -12,4 +12,5 @@
   if (urlParams.get('theme') && ['auto', 'dark', 'light'].includes(urlParams.get('theme'))) {
     localStorage.setItem(THEME, urlParams.get('theme'))
   }
+
 })()

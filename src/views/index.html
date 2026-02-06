@@ -1,562 +1,325 @@
 <!DOCTYPE html>
-<!--
-* CoreUI - Free Bootstrap Admin Template
-* @version v5.3.0
-* @link https://coreui.io/product/free-bootstrap-admin-template/
-* Copyright (c) 2025 creativeLabs Łukasz Holeczek
-* Licensed under MIT (https://github.com/coreui/coreui-free-bootstrap-admin-template/blob/main/LICENSE)
--->
-
 <html lang="en">
   <head>
     <base href="./">
     <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
-    <meta name="description" content="CoreUI - Open Source Bootstrap Admin Template">
-    <meta name="author" content="Łukasz Holeczek">
-    <meta name="keyword" content="Bootstrap,Admin,Template,Open,Source,jQuery,CSS,HTML,RWD,Dashboard">
-    <title>CoreUI Free Bootstrap Admin Template</title>
-    <link rel="apple-touch-icon" sizes="57x57" href="assets/favicon/apple-icon-57x57.png">
-    <link rel="apple-touch-icon" sizes="60x60" href="assets/favicon/apple-icon-60x60.png">
-    <link rel="apple-touch-icon" sizes="72x72" href="assets/favicon/apple-icon-72x72.png">
-    <link rel="apple-touch-icon" sizes="76x76" href="assets/favicon/apple-icon-76x76.png">
-    <link rel="apple-touch-icon" sizes="114x114" href="assets/favicon/apple-icon-114x114.png">
-    <link rel="apple-touch-icon" sizes="120x120" href="assets/favicon/apple-icon-120x120.png">
-    <link rel="apple-touch-icon" sizes="144x144" href="assets/favicon/apple-icon-144x144.png">
-    <link rel="apple-touch-icon" sizes="152x152" href="assets/favicon/apple-icon-152x152.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="assets/favicon/apple-icon-180x180.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="assets/favicon/android-icon-192x192.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="96x96" href="assets/favicon/favicon-96x96.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon/favicon-16x16.png">
-    <link rel="manifest" href="assets/favicon/manifest.json">
-    <meta name="msapplication-TileColor" content="#ffffff">
-    <meta name="msapplication-TileImage" content="assets/favicon/ms-icon-144x144.png">
-    <meta name="theme-color" content="#ffffff">
-    <!-- Vendors styles-->
-    <link rel="stylesheet" href="node_modules/simplebar/dist/simplebar.css">
-    <link rel="stylesheet" href="css/vendors/simplebar.css">
-    <!-- Main styles for this application-->
-    <link href="css/style.css" rel="stylesheet">
-    <!-- We use those styles to show code examples, you should remove them in your application.-->
-    <link href="css/examples.css" rel="stylesheet">
-    <script src="js/config.js"></script>
-    <script src="js/color-modes.js"></script>
-    <link rel="stylesheet" href="node_modules/@coreui/chartjs/dist/css/coreui-chartjs.css">
-    <link rel="stylesheet" href="css/dashboard.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Wi-Fi Project Benchmark</title>
+
+    <link rel="shortcut icon" type="image/x-icon" href="assets/zay559/img/favicon.ico">
+    <link rel="apple-touch-icon" href="assets/zay559/img/apple-icon.png">
+
+    <link rel="stylesheet" href="assets/zay559/css/bootstrap.min.css">
+    <link rel="stylesheet" href="assets/zay559/css/templatemo.css">
+    <link rel="stylesheet" href="assets/zay559/css/custom.css">
+    <link rel="stylesheet" href="assets/zay559/css/fontawesome.min.css">
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;200;300;400;500;700;900&display=swap"
+    >
+
+    <style>
+      .lb-card { border: 1px solid rgba(0, 0, 0, 0.06); }
+      .navbar-nav { align-items: center; }
+
+      .scenario-tabs .nav-link {
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        border-radius: 999px;
+        padding: 0.55rem 0.9rem;
+        color: #212529;
+        background: #fff;
+        transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+      }
+      .scenario-tabs .nav-link:hover {
+        border-color: rgba(89, 171, 110, 0.45);
+        box-shadow: 0 0 0 0.2rem rgba(89, 171, 110, 0.15);
+      }
+      .scenario-tabs .nav-link.active {
+        background: #59ab6e;
+        border-color: #59ab6e;
+        color: #fff;
+      }
+
+      .leaderboard-title { color: #212529; }
+      .leaderboard-subtitle { color: #6c757d; }
+      .leaderboard-list { display: flex; flex-direction: column; gap: 0.5rem; }
+      .leaderboard-item {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        padding: 0.75rem 0.75rem;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 0.9rem;
+        background: #fff;
+        transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+      }
+      .leaderboard-item:hover {
+        border-color: rgba(89, 171, 110, 0.35);
+        box-shadow: 0 0.4rem 1.4rem rgba(0, 0, 0, 0.06);
+        transform: translateY(-1px);
+      }
+      .leaderboard-rank {
+        width: 2.25rem;
+        height: 2.25rem;
+        display: grid;
+        place-items: center;
+        border-radius: 0.8rem;
+        font-weight: 700;
+        color: #212529;
+        background: rgba(33, 37, 41, 0.06);
+        flex: 0 0 auto;
+      }
+      .leaderboard-item.is-top-1 .leaderboard-rank {
+        color: #0b3d1a;
+        background: rgba(89, 171, 110, 0.22);
+      }
+      .leaderboard-item.is-top-1 {
+        border-color: rgba(89, 171, 110, 0.45);
+        background: linear-gradient(180deg, rgba(89, 171, 110, 0.10), rgba(255, 255, 255, 0.90));
+      }
+      .leaderboard-main { min-width: 0; flex: 1 1 auto; }
+      .leaderboard-name { font-weight: 700; color: #212529; line-height: 1.2; }
+      .leaderboard-meta { margin-top: 0.2rem; font-size: 0.825rem; color: #6c757d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .leaderboard-score { text-align: right; flex: 0 0 auto; min-width: 7.5rem; }
+      .leaderboard-score-value { font-weight: 800; color: #212529; }
+      .leaderboard-score-label { font-size: 0.75rem; color: #6c757d; }
+      .leaderboard-bar {
+        margin-top: 0.45rem;
+        height: 0.4rem;
+        border-radius: 999px;
+        background: rgba(33, 37, 41, 0.08);
+        overflow: hidden;
+      }
+      .leaderboard-bar > div {
+        height: 100%;
+        border-radius: 999px;
+        background: #59ab6e;
+        width: 0%;
+      }
+
+      .hero-image-slot { background: #efefef; border: 1px solid rgba(0, 0, 0, 0.08); }
+
+      .scoring-popover {
+        position: fixed;
+        z-index: 1080;
+        max-width: 520px;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        border-radius: 0.75rem;
+        box-shadow: 0 0.8rem 2rem rgba(0, 0, 0, 0.12);
+        padding: 0.75rem 0.85rem;
+        color: #212529;
+      }
+      .scoring-popover[hidden] { display: none !important; }
+      .scoring-popover__title { font-weight: 700; margin-bottom: 0.4rem; }
+      .scoring-popover__content { font-size: 0.875rem; color: #212529; }
+      .scoring-popover__content ul { margin-bottom: 0.5rem; }
+      .scoring-popover__arrow {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background: #fff;
+        border-left: 1px solid rgba(0, 0, 0, 0.12);
+        border-top: 1px solid rgba(0, 0, 0, 0.12);
+        transform: rotate(45deg);
+      }
+    </style>
   </head>
-  <body class="dashboard-page">
-    <div class="sidebar sidebar-dark sidebar-fixed border-end" id="sidebar">
-      <div class="sidebar-header border-bottom">
-        <div class="sidebar-brand">
-          <svg class="sidebar-brand-full" width="88" height="32" alt="CoreUI Logo">
-            <use xlink:href="assets/brand/coreui.svg#full"></use>
-          </svg>
-          <svg class="sidebar-brand-narrow" width="32" height="32" alt="CoreUI Logo">
-            <use xlink:href="assets/brand/coreui.svg#signet"></use>
-          </svg>
+
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-light shadow-sm">
+      <div class="container-fluid px-4 d-flex justify-content-between align-items-center">
+        <a class="navbar-brand text-success logo h1 align-self-center mb-0" href="index.html">WiFi</a>
+        <button
+          class="navbar-toggler border-0"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#main_nav"
+          aria-controls="main_nav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="align-self-center collapse navbar-collapse flex-fill d-lg-flex justify-content-lg-between" id="main_nav">
+          <div class="flex-fill">
+            <ul class="navbar-nav mx-lg-auto gap-2 gap-lg-3">
+              <li class="nav-item"><a class="nav-link active" href="index.html">Home</a></li>
+              <li class="nav-item dropdown">
+                <a
+                  class="nav-link dropdown-toggle"
+                  href="#"
+                  role="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                  id="moduleDropdownToggle"
+                >Module</a>
+                <ul class="dropdown-menu" id="moduleDropdownMenu" aria-labelledby="moduleDropdownToggle"></ul>
+              </li>
+              <li class="nav-item dropdown">
+                <a
+                  class="nav-link dropdown-toggle"
+                  href="#"
+                  role="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                  id="interfaceDropdownToggle"
+                >Interface</a>
+                <ul class="dropdown-menu" id="interfaceDropdownMenu" aria-labelledby="interfaceDropdownToggle"></ul>
+              </li>
+              <li class="nav-item"><a class="nav-link" href="about.html">About</a></li>
+            </ul>
+          </div>
+
+          <div class="navbar align-self-center d-flex ms-lg-auto">
+            <a class="nav-icon position-relative text-decoration-none" href="wifi-dashboard.html" title="Dashboard">
+              <i class="fa fa-fw fa-chart-line text-dark"></i>
+              <span class="ms-1 d-none d-lg-inline">Dashboard</span>
+            </a>
+          </div>
         </div>
-        <button class="btn-close d-lg-none" type="button" data-coreui-theme="dark" aria-label="Close" onclick="coreui.Sidebar.getInstance(document.querySelector(&quot;#sidebar&quot;)).toggle()"></button>
       </div>
-      <ul class="sidebar-nav" data-coreui="navigation" data-simplebar>
-        <li class="nav-item"><a class="nav-link" href="index.html">
-            <svg class="nav-icon">
-              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-speedometer"></use>
-            </svg> Dashboard<span class="badge badge-sm bg-info ms-auto">NEW</span></a></li>
-        <li class="nav-title">Theme</li>
-        <li class="nav-item"><a class="nav-link" href="colors.html">
-            <svg class="nav-icon">
-              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-drop"></use>
-            </svg> Colors</a></li>
-        <li class="nav-item"><a class="nav-link" href="typography.html">
-            <svg class="nav-icon">
-              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-pencil"></use>
-            </svg> Typography</a></li>
-        <li class="nav-title">Components</li>
-        <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
-            <svg class="nav-icon">
-              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-puzzle"></use>
-            </svg> Base</a>
-          <ul class="nav-group-items compact">
-            <li class="nav-item"><a class="nav-link" href="base/accordion.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Accordion</a></li>
-            <li class="nav-item"><a class="nav-link" href="base/breadcrumb.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Breadcrumb</a></li>
-            <li class="nav-item"><a class="nav-link" href="https://coreui.io/bootstrap/docs/components/calendar/" target="_blank"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Calendar
-                <svg class="icon icon-sm ms-2">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-external-link"></use>
-                </svg><span class="badge badge-sm bg-danger ms-auto">PRO</span></a></li>
-            <li class="nav-item"><a class="nav-link" href="base/cards.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Cards</a></li>
-            <li class="nav-item"><a class="nav-link" href="base/carousel.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Carousel</a></li>
-            <li class="nav-item"><a class="nav-link" href="base/collapse.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Collapse</a></li>
-            <li class="nav-item"><a class="nav-link" href="base/list-group.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> List group</a></li>
-            <li class="nav-item"><a class="nav-link" href="base/navs-tabs.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Navs &amp; Tabs</a></li>
-            <li class="nav-item"><a class="nav-link" href="base/pagination.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Pagination</a></li>
-            <li class="nav-item"><a class="nav-link" href="base/placeholders.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Placeholders</a></li>
-            <li class="nav-item"><a class="nav-link" href="base/popovers.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Popovers</a></li>
-            <li class="nav-item"><a class="nav-link" href="base/progress.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Progress</a></li>
-            <li class="nav-item"><a class="nav-link" href="base/spinners.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Spinners</a></li>
-            <li class="nav-item"><a class="nav-link" href="base/tables.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Tables</a></li>
-            <li class="nav-item"><a class="nav-link" href="base/tooltips.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Tooltips</a></li>
-          </ul>
-        </li>
-        <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
-            <svg class="nav-icon">
-              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-cursor"></use>
-            </svg> Buttons</a>
-          <ul class="nav-group-items compact">
-            <li class="nav-item"><a class="nav-link" href="buttons/buttons.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Buttons</a></li>
-            <li class="nav-item"><a class="nav-link" href="buttons/button-group.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Buttons Group</a></li>
-            <li class="nav-item"><a class="nav-link" href="buttons/dropdowns.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Dropdowns</a></li>
-            <li class="nav-item"><a class="nav-link" href="https://coreui.io/bootstrap/docs/components/loading-buttons/" target="_blank"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Loading Buttons
-                <svg class="icon icon-sm ms-2">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-external-link"></use>
-                </svg><span class="badge badge-sm bg-danger ms-auto">PRO</span></a></li>
-          </ul>
-        </li>
-        <li class="nav-item"><a class="nav-link" href="charts.html">
-            <svg class="nav-icon">
-              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-chart-pie"></use>
-            </svg> Charts</a></li>
-        <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
-            <svg class="nav-icon">
-              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-notes"></use>
-            </svg> Forms</a>
-          <ul class="nav-group-items compact">
-            <li class="nav-item"><a class="nav-link" href="https://coreui.io/bootstrap/docs/forms/autocomplete/" target="_blank"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Autocomplete
-                <svg class="icon icon-sm ms-2">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-external-link"></use>
-                </svg><span class="badge badge-sm bg-danger ms-auto">PRO</span></a></li>
-            <li class="nav-item"><a class="nav-link" href="forms/checks-radios.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Checks and radios</a></li>
-            <li class="nav-item"><a class="nav-link" href="https://coreui.io/bootstrap/docs/forms/date-picker/" target="_blank"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Date Picker
-                <svg class="icon icon-sm ms-2">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-external-link"></use>
-                </svg><span class="badge badge-sm bg-danger ms-auto">PRO</span></a></li>
-            <li class="nav-item"><a class="nav-link" href="https://coreui.io/bootstrap/docs/forms/date-range-picker/" target="_blank"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Date Range Picker<span class="badge badge-sm bg-danger ms-auto">PRO</span></a></li>
-            <li class="nav-item"><a class="nav-link" href="forms/floating-labels.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Floating labels</a></li>
-            <li class="nav-item"><a class="nav-link" href="forms/form-control.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Form Control</a></li>
-            <li class="nav-item"><a class="nav-link" href="forms/input-group.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Input group</a></li>
-            <li class="nav-item"><a class="nav-link" href="https://coreui.io/bootstrap/docs/forms/multi-select/" target="_blank"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Multi Select
-                <svg class="icon icon-sm ms-2">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-external-link"></use>
-                </svg><span class="badge badge-sm bg-danger ms-auto">PRO</span></a></li>
-            <li class="nav-item"><a class="nav-link" href="forms/range.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Range</a></li>
-            <li class="nav-item"><a class="nav-link" href="https://coreui.io/bootstrap/docs/forms/range-slider/" target="_blank"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Range Slider
-                <svg class="icon icon-sm ms-2">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-external-link"></use>
-                </svg><span class="badge badge-sm bg-danger ms-auto">PRO</span></a></li>
-            <li class="nav-item"><a class="nav-link" href="https://coreui.io/bootstrap/docs/forms/rating/" target="_blank"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Rating
-                <svg class="icon icon-sm ms-2">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-external-link"></use>
-                </svg><span class="badge badge-sm bg-danger ms-auto">PRO</span></a></li>
-            <li class="nav-item"><a class="nav-link" href="forms/select.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Select</a></li>
-            <li class="nav-item"><a class="nav-link" href="https://coreui.io/bootstrap/docs/forms/time-picker/" target="_blank"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Time Picker
-                <svg class="icon icon-sm ms-2">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-external-link"></use>
-                </svg><span class="badge badge-sm bg-danger ms-auto">PRO</span></a></li>
-            <li class="nav-item"><a class="nav-link" href="forms/layout.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Layout</a></li>
-            <li class="nav-item"><a class="nav-link" href="forms/validation.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Validation</a></li>
-          </ul>
-        </li>
-        <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
-            <svg class="nav-icon">
-              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-star"></use>
-            </svg> Icons</a>
-          <ul class="nav-group-items compact">
-            <li class="nav-item"><a class="nav-link" href="icons/coreui-icons-free.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> CoreUI Icons<span class="badge badge-sm bg-success ms-auto">Free</span></a></li>
-            <li class="nav-item"><a class="nav-link" href="icons/coreui-icons-brand.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> CoreUI Icons - Brand</a></li>
-            <li class="nav-item"><a class="nav-link" href="icons/coreui-icons-flag.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> CoreUI Icons - Flag</a></li>
-          </ul>
-        </li>
-        <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
-            <svg class="nav-icon">
-              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-bell"></use>
-            </svg> Notifications</a>
-          <ul class="nav-group-items compact">
-            <li class="nav-item"><a class="nav-link" href="notifications/alerts.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Alerts</a></li>
-            <li class="nav-item"><a class="nav-link" href="notifications/badge.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Badge</a></li>
-            <li class="nav-item"><a class="nav-link" href="notifications/modals.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Modals</a></li>
-            <li class="nav-item"><a class="nav-link" href="notifications/toasts.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Toasts</a></li>
-          </ul>
-        </li>
-        <li class="nav-item"><a class="nav-link" href="widgets.html">
-            <svg class="nav-icon">
-              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-calculator"></use>
-            </svg> Widgets<span class="badge badge-sm bg-info ms-auto">NEW</span></a></li>
-        <li class="nav-divider"></li>
-        <li class="nav-title">Extras</li>
-        <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
-            <svg class="nav-icon">
-              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-star"></use>
-            </svg> Pages</a>
-          <ul class="nav-group-items compact">
-            <li class="nav-item"><a class="nav-link" href="login.html" target="_top">
-                <svg class="nav-icon">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-account-logout"></use>
-                </svg> Login</a></li>
-            <li class="nav-item"><a class="nav-link" href="register.html" target="_top">
-                <svg class="nav-icon">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-account-logout"></use>
-                </svg> Register</a></li>
-            <li class="nav-item"><a class="nav-link" href="404.html" target="_top">
-                <svg class="nav-icon">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-bug"></use>
-                </svg> Error 404</a></li>
-            <li class="nav-item"><a class="nav-link" href="500.html" target="_top">
-                <svg class="nav-icon">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-bug"></use>
-                </svg> Error 500</a></li>
-          </ul>
-        </li>
-        <li class="nav-item mt-auto"><a class="nav-link" href="https://coreui.io/bootstrap/docs/templates/installation/" target="_blank">
-            <svg class="nav-icon">
-              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-description"></use>
-            </svg> Docs</a></li>
-        <li class="nav-item"><a class="nav-link text-primary fw-semibold" href="https://coreui.io/product/bootstrap-dashboard-template/" target="_top">
-            <svg class="nav-icon text-primary">
-              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-layers"></use>
-            </svg> Try CoreUI PRO</a></li>
-      </ul>
-      <div class="sidebar-footer border-top d-none d-md-flex">     
-        <button class="sidebar-toggler" type="button" data-coreui-toggle="unfoldable"></button>
+    </nav>
+
+    <div id="homeHeroCarousel" class="carousel slide bg-success" data-bs-ride="carousel">
+      <ol class="carousel-indicators">
+        <li data-bs-target="#homeHeroCarousel" data-bs-slide-to="0" class="active"></li>
+        <li data-bs-target="#homeHeroCarousel" data-bs-slide-to="1"></li>
+        <li data-bs-target="#homeHeroCarousel" data-bs-slide-to="2"></li>
+      </ol>
+      <div class="carousel-inner">
+        <div class="carousel-item active">
+          <div class="container">
+            <div class="row p-5 align-items-center">
+              <div class="mx-auto col-md-8 col-lg-6 order-lg-last">
+                <div class="hero-image-slot rounded-3 overflow-hidden border-0" style="height: 320px; background-color: #59ab6e;">
+                  <img src="assets/project/ONN-Carema.png" class="w-100 h-100" alt="Project showcase" style="object-fit: contain;">
+                </div>
+              </div>
+              <div class="col-lg-6 mb-0 d-flex align-items-center">
+                <div class="text-align-left align-self-center">
+                  <h1 class="h1">Project Benchmark</h1>
+                  <h3 class="h2">Compare projects with scenario leaderboards</h3>
+                  <p class="mb-0">Use Module / Interface filters in the top menu.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="carousel-item">
+          <div class="container">
+            <div class="row p-5 align-items-center">
+              <div class="mx-auto col-md-8 col-lg-6 order-lg-last">
+                <div class="hero-image-slot rounded-3 overflow-hidden border-0" style="height: 320px; background-color: #59ab6e;">
+                  <img src="assets/project/ONN-Roku-TV.png" class="w-100 h-100" alt="Project showcase" style="object-fit: contain;">
+                </div>
+              </div>
+              <div class="col-lg-6 mb-0 d-flex align-items-center">
+                <div class="text-align-left">
+                  <h1 class="h1">Leaderboards</h1>
+                  <h3 class="h2">Performance, Home, Interference</h3>
+                  <p class="mb-0">Switch scenarios to see top projects instantly.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="carousel-item">
+          <div class="container">
+            <div class="row p-5 align-items-center">
+              <div class="mx-auto col-md-8 col-lg-6 order-lg-last">
+                <div class="hero-image-slot rounded-3 overflow-hidden border-0" style="height: 320px; background-color: #59ab6e;">
+                  <img src="assets/project/XIAOMI-TV.png" class="w-100 h-100" alt="Project showcase" style="object-fit: contain;">
+                </div>
+              </div>
+              <div class="col-lg-6 mb-0 d-flex align-items-center">
+                <div class="text-align-left">
+                  <h1 class="h1">Quick Preview</h1>
+                  <h3 class="h2">Charts and details in Dashboard</h3>
+                  <p class="mb-0">Open the dashboard for deeper analysis.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <a class="carousel-control-prev text-decoration-none w-auto ps-3" href="#homeHeroCarousel" role="button" data-bs-slide="prev">
+        <i class="fas fa-chevron-left"></i>
+      </a>
+      <a class="carousel-control-next text-decoration-none w-auto pe-3" href="#homeHeroCarousel" role="button" data-bs-slide="next">
+        <i class="fas fa-chevron-right"></i>
+      </a>
     </div>
-    <div class="wrapper d-flex flex-column min-vh-100 dashboard-wrapper">
-      <header class="header header-sticky p-0 mb-4">
-        <div class="container-fluid border-bottom px-4">
-          <button class="header-toggler" type="button" onclick="coreui.Sidebar.getInstance(document.querySelector('#sidebar')).toggle()" style="margin-inline-start: -14px;">
-            <svg class="icon icon-lg">
-              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-menu"></use>
-            </svg>
-          </button>
-          <ul class="header-nav d-none d-lg-flex">
-            <li class="nav-item"><a class="nav-link" href="#">Dashboard</a></li>
-            <li class="nav-item"><a class="nav-link" href="#">Users</a></li>
-            <li class="nav-item"><a class="nav-link" href="#">Settings</a></li>
-          </ul>
-          <ul class="header-nav ms-auto">
-            <li class="nav-item"><a class="nav-link" href="#">
-                <svg class="icon icon-lg">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-bell"></use>
-                </svg></a></li>
-            <li class="nav-item"><a class="nav-link" href="#">
-                <svg class="icon icon-lg">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-list-rich"></use>
-                </svg></a></li>
-            <li class="nav-item"><a class="nav-link" href="#">
-                <svg class="icon icon-lg">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-envelope-open"></use>
-                </svg></a></li>
-          </ul>
-          <ul class="header-nav">
-            <li class="nav-item py-1">
-              <div class="vr h-100 mx-2 text-body text-opacity-75"></div>
-            </li>
-            <li class="nav-item dropdown">
-              <button class="btn btn-link nav-link py-2 px-2 d-flex align-items-center" type="button" aria-expanded="false" data-coreui-toggle="dropdown">
-                <svg class="icon icon-lg theme-icon-active">
-                  <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-contrast"></use>
-                </svg>
+
+    <section class="py-5">
+      <div class="container">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h2 class="h2 mb-0">Leaderboards</h2>
+          <div class="small text-muted">By scenario</div>
+        </div>
+
+        <ul class="nav nav-pills gap-2 mb-2 scenario-tabs" id="leaderboardScenarioTabs" role="tablist" aria-label="Leaderboard scenarios">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" type="button" data-leaderboard-scenario="performance">Performance</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" type="button" data-leaderboard-scenario="home">Home Environment</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" type="button" data-leaderboard-scenario="interference">Interference</button>
+          </li>
+        </ul>
+        <div class="small text-muted mb-2" id="leaderboardScenarioHint"></div>
+
+        <ul class="nav nav-pills gap-2 mb-3 scenario-tabs" id="leaderboardDataTypeTabs" role="tablist" aria-label="Performance data types">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" type="button" data-leaderboard-datatype="PEAK_THROUGHPUT">Peak Throughput</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" type="button" data-leaderboard-datatype="RVR">RVR</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" type="button" data-leaderboard-datatype="RVO">RVO</button>
+          </li>
+        </ul>
+
+        <div class="lb-card rounded-3 p-3">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="fw-semibold leaderboard-title" id="leaderboardTitle">Top Projects</div>
+            <div class="d-flex align-items-center gap-2">
+              <div class="small leaderboard-subtitle" id="leaderboardSubtitle">Sorted by score</div>
+              <button
+                class="btn btn-link p-0 text-decoration-none"
+                type="button"
+                id="scoringHelp"
+                aria-label="Scoring rules"
+                title="Scoring rules"
+                style="line-height: 1;"
+              >
+                <span
+                  class="d-inline-flex align-items-center justify-content-center rounded-circle border"
+                  style="width: 22px; height: 22px; font-weight: 700; color: #59ab6e; border-color: rgba(89, 171, 110, 0.5) !important;"
+                >?</span>
               </button>
-              <ul class="dropdown-menu dropdown-menu-end" style="--cui-dropdown-min-width: 8rem;">
-                <li>
-                  <button class="dropdown-item d-flex align-items-center" type="button" data-coreui-theme-value="light">
-                    <svg class="icon icon-lg me-3">
-                      <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-sun"></use>
-                    </svg>Light
-                  </button>
-                </li>
-                <li>
-                  <button class="dropdown-item d-flex align-items-center" type="button" data-coreui-theme-value="dark">
-                    <svg class="icon icon-lg me-3">
-                      <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-moon"></use>
-                    </svg>Dark
-                  </button>
-                </li>
-                <li>
-                  <button class="dropdown-item d-flex align-items-center active" type="button" data-coreui-theme-value="auto">
-                    <svg class="icon icon-lg me-3">
-                      <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-contrast"></use>
-                    </svg>Auto
-                  </button>
-                </li>
-              </ul>
-            </li>
-            <li class="nav-item py-1">
-              <div class="vr h-100 mx-2 text-body text-opacity-75"></div>
-            </li>
-            <li class="nav-item dropdown"><a class="nav-link py-0 pe-0" data-coreui-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
-                <div class="avatar avatar-md"><img class="avatar-img" src="assets/img/avatars/8.jpg" alt="user@email.com"></div></a>
-              <div class="dropdown-menu dropdown-menu-end pt-0">
-                <div class="dropdown-header bg-body-tertiary text-body-secondary fw-semibold rounded-top mb-2">Account</div><a class="dropdown-item" href="#">
-                  <svg class="icon me-2">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-bell"></use>
-                  </svg> Updates<span class="badge badge-sm bg-info ms-2">42</span></a><a class="dropdown-item" href="#">
-                  <svg class="icon me-2">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-envelope-open"></use>
-                  </svg> Messages<span class="badge badge-sm bg-success ms-2">42</span></a><a class="dropdown-item" href="#">
-                  <svg class="icon me-2">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-task"></use>
-                  </svg> Tasks<span class="badge badge-sm bg-danger ms-2">42</span></a><a class="dropdown-item" href="#">
-                  <svg class="icon me-2">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-comment-square"></use>
-                  </svg> Comments<span class="badge badge-sm bg-warning ms-2">42</span></a>
-                <div class="dropdown-header bg-body-tertiary text-body-secondary fw-semibold my-2">
-                  <div class="fw-semibold">Settings</div>
-                </div><a class="dropdown-item" href="#">
-                  <svg class="icon me-2">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-user"></use>
-                  </svg> Profile</a><a class="dropdown-item" href="#">
-                  <svg class="icon me-2">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-settings"></use>
-                  </svg> Settings</a><a class="dropdown-item" href="#">
-                  <svg class="icon me-2">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-credit-card"></use>
-                  </svg> Payments<span class="badge badge-sm bg-secondary ms-2">42</span></a><a class="dropdown-item" href="#">
-                  <svg class="icon me-2">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-file"></use>
-                  </svg> Projects<span class="badge badge-sm bg-primary ms-2">42</span></a>
-                <div class="dropdown-divider"></div><a class="dropdown-item" href="#">
-                  <svg class="icon me-2">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-lock-locked"></use>
-                  </svg> Lock Account</a><a class="dropdown-item" href="#">
-                  <svg class="icon me-2">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-account-logout"></use>
-                  </svg> Logout</a>
-              </div>
-            </li>
-          </ul>
-        </div>
-        <div class="container-fluid px-4">
-          <nav aria-label="breadcrumb">
-            <ol class="breadcrumb my-0">
-              <li class="breadcrumb-item"><a href="#">Home</a>
-              </li>
-              <li class="breadcrumb-item active"><span>Dashboard</span>
-              </li>
-            </ol>
-          </nav>
-        </div>
-      </header>
-      <div class="body flex-grow-1">
-        <div class="container-fluid px-4 px-xl-5 dashboard-content">
-          <div class="dashboard-hero card border-0 text-white mb-4">
-            <div class="card-body p-4 p-xl-5">
-              <div class="row g-4 align-items-center">
-                <div class="col-lg-8">
-                  <h1 class="display-6 fw-semibold mb-3">Wi-Fi Performance Command Center</h1>
-                  <p class="mb-0">Monitor lab throughput, latency, and capacity in real time so teams can spot bottlenecks quickly and focus on the metrics that matter.</p>
-                </div>
-                <div class="col-lg-4">
-                  <div class="hero-stats d-flex flex-wrap justify-content-lg-end">
-                    <div class="hero-stat"><span class="hero-stat__label">SLA Pass Rate</span><span class="hero-stat__value">98.4%</span><span class="hero-stat__trend">
-                        <svg class="icon">
-                          <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-arrow-circle-top"></use>
-                        </svg>+2.1%</span></div>
-                    <div class="hero-stat"><span class="hero-stat__label">Last Updated</span><span class="hero-stat__value">5 minutes ago</span></div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
-          <div class="row g-4 mb-4">
-            <div class="col-12 col-sm-6 col-xl-3">
-              <div class="metric-card gradient-indigo h-100">
-                <div class="metric-icon">
-                  <svg class="icon">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-speedometer"></use>
-                  </svg>
-                </div>
-                <div class="metric-label">Realtime Throughput (Tx)</div>
-                <div class="metric-value">612 Mbps</div>
-                <div class="metric-trend">
-                  <svg class="icon">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-arrow-top"></use>
-                  </svg>WoW +12%
-                </div>
-              </div>
-            </div>
-            <div class="col-12 col-sm-6 col-xl-3">
-              <div class="metric-card gradient-pink h-100">
-                <div class="metric-icon">
-                  <svg class="icon">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-wifi-signal-4"></use>
-                  </svg>
-                </div>
-                <div class="metric-label">Realtime Throughput (Rx)</div>
-                <div class="metric-value">588 Mbps</div>
-                <div class="metric-trend">
-                  <svg class="icon">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-arrow-top"></use>
-                  </svg>WoW +9%
-                </div>
-              </div>
-            </div>
-            <div class="col-12 col-sm-6 col-xl-3">
-              <div class="metric-card gradient-amber h-100">
-                <div class="metric-icon">
-                  <svg class="icon">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-layers"></use>
-                  </svg>
-                </div>
-                <div class="metric-label">Active Tests</div>
-                <div class="metric-value">128 Runs</div>
-                <div class="metric-trend">
-                  <svg class="icon">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-calendar"></use>
-                  </svg>Planned this week 142
-                </div>
-              </div>
-            </div>
-            <div class="col-12 col-sm-6 col-xl-3">
-              <div class="metric-card gradient-emerald h-100">
-                <div class="metric-icon">
-                  <svg class="icon">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-chart-line"></use>
-                  </svg>
-                </div>
-                <div class="metric-label">Average Latency</div>
-                <div class="metric-value">18 ms</div>
-                <div class="metric-trend">
-                  <svg class="icon">
-                    <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-arrow-bottom"></use>
-                  </svg>DoD -4%
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="row g-4">
-            <div class="col-12 col-xl-4 col-xxl-3">
-              <div class="card h-100 card-glass">
-                <div class="card-header">
-                  <h5 class="mb-0">Filter Controls</h5>
-                </div>
-                <div class="card-body">
-                  <form class="row g-3 align-items-end" id="filtersForm">
-                    <div class="col-12 col-md-6">
-                      <label class="form-label" for="filterProductLine">Product Line</label>
-                      <select class="form-select" id="filterProductLine">
-                        <option value="">All Product Lines</option>
-                      </select>
-                    </div>
-                    <div class="col-12 col-md-6">
-                      <label class="form-label" for="filterProject">Project</label>
-                      <select class="form-select" id="filterProject">
-                        <option value="">All Projects</option>
-                      </select>
-                    </div>
-                    <div class="col-12 col-md-6">
-                      <label class="form-label" for="filterStandard">Standard</label>
-                      <select class="form-select" id="filterStandard">
-                        <option value="">All Standards</option>
-                      </select>
-                    </div>
-                    <div class="col-12 col-md-6">
-                      <label class="form-label" for="filterBand">Band</label>
-                      <select class="form-select" id="filterBand">
-                        <option value="">All Bands</option>
-                      </select>
-                    </div>
-                    <div class="col-12 col-md-6">
-                      <label class="form-label" for="filterBandwidth">Bandwidth</label>
-                      <select class="form-select" id="filterBandwidth">
-                        <option value="">All Bandwidths</option>
-                      </select>
-                    </div>
-                    <div class="col-12 col-md-6">
-                      <label class="form-label" for="filterDeviceType">Device Field</label>
-                      <select class="form-select" id="filterDeviceType">
-                        <option value="">All Device Fields</option>
-                        <option value="adb_device">ADB Device</option>
-                        <option value="telnet_ip">Telnet IP</option>
-                      </select>
-                    </div>
-                    <div class="col-12 col-md-6">
-                      <label class="form-label" for="filterDeviceValue">Device Value</label>
-                      <select class="form-select" id="filterDeviceValue" disabled>
-                        <option value="">Select a device field</option>
-                      </select>
-                    </div>
-                    <div class="col-12 col-md-6">
-                      <label class="form-label" for="filterStartDate">Start Date</label>
-                      <input class="form-control" id="filterStartDate" type="date">
-                    </div>
-                    <div class="col-12 col-md-6">
-                      <label class="form-label" for="filterEndDate">End Date</label>
-                      <input class="form-control" id="filterEndDate" type="date">
-                    </div>
-                    <div class="col-12 d-flex flex-wrap gap-2 justify-content-end">
-                      <button class="btn btn-outline-secondary" type="reset">Reset</button>
-                      <button class="btn btn-primary" type="submit">Apply Filters</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </div>
-            <div class="col-12 col-xl-8 col-xxl-9">
-              <div class="card h-100 card-glass">
-                <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-                  <h5 class="mb-0">Wi-Fi Performance Overview</h5>
-                  <div class="d-flex flex-wrap gap-2">
-                    <button class="btn btn-outline-secondary btn-sm" id="refreshButton" type="button">
-                      <svg class="icon me-1">
-                        <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-reload"></use>
-                      </svg>Refresh
-                    </button>
-                    <button class="btn btn-outline-primary btn-sm" id="exportButton" type="button">
-                      <svg class="icon me-1">
-                        <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-cloud-download"></use>
-                      </svg>Export
-                    </button>
-                  </div>
-                </div>
-                <div class="card-body d-flex flex-column gap-4">
-                  <div class="status-banner">
-                    <p class="small mb-0" id="statusMessage">Choose filters and click "Apply Filters" to run the query.</p>
-                  </div>
-                  <div class="chart-section">
-                    <h6 class="fw-semibold mb-3">Tx (Uplink)</h6>
-                    <div class="chart-container position-relative" style="min-height: 320px;">
-                      <canvas id="performanceChartTx" style="min-height: 320px; width: 100%;"></canvas>
-                      <div class="chart-empty-state fw-semibold position-absolute top-50 start-50 translate-middle text-center" id="chartEmptyStateTx" style="display: none;">No data for Tx direction. Adjust the filters and try again.</div>
-                    </div>
-                  </div>
-                  <div class="chart-section">
-                    <h6 class="fw-semibold mb-3">Rx (Downlink)</h6>
-                    <div class="chart-container position-relative" style="min-height: 320px;">
-                      <canvas id="performanceChartRx" style="min-height: 320px; width: 100%;"></canvas>
-                      <div class="chart-empty-state fw-semibold position-absolute top-50 start-50 translate-middle text-center" id="chartEmptyStateRx" style="display: none;">No data for Rx direction. Adjust the filters and try again.</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <div id="lb-scenario"></div>
         </div>
       </div>
-      <footer class="footer px-4">
-        <div><a href="https://coreui.io">CoreUI </a><a href="https://coreui.io/product/free-bootstrap-admin-template/">Bootstrap Admin Template</a> &copy; 2025 creativeLabs.</div>
-        <div class="ms-auto">Powered by&nbsp;<a href="https://coreui.io/bootstrap/docs/">CoreUI UI Components</a></div>
-      </footer>
-    </div>
-    <!-- CoreUI and necessary plugins-->
-    <script src="node_modules/@coreui/coreui/dist/js/coreui.bundle.min.js"></script>
-    <script src="node_modules/simplebar/dist/simplebar.min.js"></script>
-    <script>
-      const header = document.querySelector('header.header');
-      
-      document.addEventListener('scroll', () => {
-        if (header) {
-          header.classList.toggle('shadow-sm', document.documentElement.scrollTop > 0);
-        }
-      });
-      
-    </script>
-    <script src="node_modules/chart.js/dist/chart.umd.js"></script>
-    <script src="node_modules/@coreui/chartjs/dist/js/coreui-chartjs.js"></script>
-    <script src="node_modules/@coreui/utils/dist/umd/index.js"></script>
-    <script src="node_modules/xlsx/dist/xlsx.full.min.js"></script>
-    <script src="js/wifi-dashboard.js"></script>
-    <script> 
-    </script>
+    </section>
+
+    <footer class="bg-dark py-4">
+      <div class="container text-light">
+        <div class="small">Template based on TemplateMo 559 Zay Shop.</div>
+        <div class="small">API: <code class="text-light">/api/leaderboard</code> | <code class="text-light">/api/filters</code></div>
+      </div>
+    </footer>
+
+    <script src="assets/zay559/js/bootstrap.bundle.min.js"></script>
+    <script src="js/home.js"></script>
   </body>
 </html>

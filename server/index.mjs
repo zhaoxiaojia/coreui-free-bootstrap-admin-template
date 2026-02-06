@@ -5,6 +5,8 @@ import cors from 'cors'
 import pool from './db.mjs'
 import filtersRouter from './routes/filters.mjs'
 import performanceRouter from './routes/performance.mjs'
+import leaderboardRouter from './routes/leaderboard.mjs'
+import leaderboardScenariosRouter from './routes/leaderboard-scenarios.mjs'
 
 const app = express()
 
@@ -23,10 +25,22 @@ app.get('/api/health', async (req, res) => {
 
 app.use('/api/filters', filtersRouter)
 app.use('/api/performance', performanceRouter)
+app.use('/api/leaderboard', leaderboardRouter)
+app.use('/api/leaderboard-scenarios', leaderboardScenariosRouter)
 
 app.use((err, req, res, next) => {
   console.error('API error', err)
-  res.status(500).json({ error: 'Internal server error' })
+  const includeDetails = (process.env.NODE_ENV ?? '').toLowerCase() !== 'production'
+  res.status(500).json({
+    error: 'Internal server error',
+    ...(includeDetails
+      ? {
+          message: err?.message ?? String(err),
+          code: err?.code ?? null,
+          sqlState: err?.sqlState ?? null
+        }
+      : {})
+  })
 })
 
 const port = Number.parseInt(process.env.API_PORT ?? process.env.PORT ?? '5000', 10)

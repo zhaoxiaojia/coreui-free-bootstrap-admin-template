@@ -247,6 +247,8 @@ body.dashboard-page .wrapper {
   gap: 0.35rem;
   cursor: pointer;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background-color: #fff;
+  background-image: none;
 }
 
 .multi-select__control::after {
@@ -286,7 +288,9 @@ body.dashboard-page .wrapper {
 }
 
 .multi-select__summary.placeholder {
-  color: rgba(15, 23, 42, 0.5);
+  color: rgba(15, 23, 42, 0.6);
+  background: transparent !important;
+  opacity: 1;
 }
 
 .multi-select__tags {
@@ -338,6 +342,11 @@ body.dashboard-page .wrapper {
   cursor: pointer;
   transition: background-color 0.15s ease;
   width: 100%;
+  min-height: 2.25rem;
+}
+
+.multi-select__option.form-check {
+  padding-left: 1rem;
 }
 
 .multi-select__option:hover {
@@ -346,7 +355,10 @@ body.dashboard-page .wrapper {
 
 .multi-select__option .form-check-input {
   margin-top: 0;
+  margin-left: 0;
   flex: 0 0 auto;
+  width: 1.1rem;
+  height: 1.1rem;
 }
 
 .multi-select__option .form-check-label {

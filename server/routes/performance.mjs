@@ -47,24 +47,31 @@ router.get('/', async (req, res, next) => {
           p.path_loss_db,
           p.throughput_avg_mbps,
           p.created_at,
-          p.test_report_id,
+          e.test_report_id,
+          p.execution_id,
           p.scenario_group_key,
           p.band,
           p.bandwidth_mhz,
           p.standard,
           p.direction,
           p.center_freq_mhz,
+          p.angle_deg,
           p.test_category,
           p.protocol,
           p.csv_name,
+          p.data_type,
+          tr.report_name,
           tr.case_path,
-          d.product_line,
-          d.project,
-          d.adb_device,
-          d.telnet_ip
+          tr.project_id,
+          pr.brand,
+          pr.product_line,
+          pr.project_name,
+          e.adb_device,
+          e.telnet_ip
         FROM performance p
-        INNER JOIN test_report tr ON tr.id = p.test_report_id
-        INNER JOIN dut d ON d.id = tr.dut_id
+        INNER JOIN execution e ON e.id = p.execution_id
+        INNER JOIN test_report tr ON tr.id = e.test_report_id
+        INNER JOIN project pr ON pr.id = tr.project_id
       `
       if (performanceFilter.conditions.length > 0) {
         query += ` WHERE ${performanceFilter.conditions.join(' AND ')}`
@@ -96,18 +103,24 @@ router.get('/', async (req, res, next) => {
         throughputAvgMbps: row.throughput_avg_mbps !== null ? Number(row.throughput_avg_mbps) : null,
         createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
         testReportId: row.test_report_id ?? null,
+        executionId: row.execution_id ?? null,
         scenarioGroupKey: row.scenario_group_key ?? null,
         band: row.band ?? null,
         bandwidthMhz: row.bandwidth_mhz !== null ? Number(row.bandwidth_mhz) : null,
         standard: row.standard ?? null,
         direction: row.direction ?? null,
         centerFreqMhz: row.center_freq_mhz !== null ? Number(row.center_freq_mhz) : null,
+        angleDeg: row.angle_deg !== null ? Number(row.angle_deg) : null,
         testCategory: row.test_category ?? null,
         protocol: row.protocol ?? null,
         csvName: row.csv_name ?? null,
+        dataType: row.data_type ?? null,
+        reportName: row.report_name ?? null,
         casePath: row.case_path ?? null,
+        projectId: row.project_id ?? null,
+        brand: row.brand ?? null,
         productLine: row.product_line ?? null,
-        project: row.project ?? null,
+        project: row.project_name ?? null,
         adbDevice: row.adb_device ?? null,
         telnetIp: row.telnet_ip ?? null
       }))

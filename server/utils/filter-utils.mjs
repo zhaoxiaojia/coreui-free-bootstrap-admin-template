@@ -26,6 +26,14 @@ const parsePositiveInteger = value => {
   return Number.isNaN(intValue) || intValue <= 0 ? null : intValue
 }
 
+const parsePositiveIntegerList = value => {
+  return uniqueValues(
+    flattenQueryValue(value)
+      .map(item => parsePositiveInteger(item))
+      .filter(item => item !== null)
+  )
+}
+
 const parseDate = value => {
   if (!value) {
     return null
@@ -96,10 +104,15 @@ const addConditionForValues = (conditions, params, column, values) => {
 
 export const normalizeFilters = query => {
   const productLines = uniqueValues(parseStringList(query.product_line ?? query.productLine))
-  const projects = uniqueValues(parseStringList(query.project))
+  const projects = uniqueValues(parseStringList(query.project ?? query.project_name ?? query.projectName))
+  const projectIds = parsePositiveIntegerList(query.project_id ?? query.projectId)
+  const hardwareVersions = uniqueValues(parseStringList(query.hardware_version ?? query.hardwareVersion))
+  const wifiModules = uniqueValues(parseStringList(query.wifi_module ?? query.wifiModule))
+  const interfaces = uniqueValues(parseStringList(query.interface))
   const standards = uniqueValues(parseStringList(query.standard))
   const bands = uniqueValues(parseStringList(query.band))
   const bandwidthsMhz = uniqueValues(parseNumberList(query.bandwidth_mhz ?? query.bandwidthMhz))
+  const dataTypes = uniqueValues(parseStringList(query.data_type ?? query.dataType))
   const testReportCsvNames = uniqueValues(
     parseStringList(
       query.test_report_csv_name ??
@@ -110,6 +123,7 @@ export const normalizeFilters = query => {
         query.csvName
     )
   )
+  const reportNames = uniqueValues(parseStringList(query.report_name ?? query.reportName))
 
   const requestedDeviceType = trimOrNull(query.deviceType ?? query.device_type)
   const deviceColumn = allowedDeviceColumns.has(requestedDeviceType) ? requestedDeviceType : null
@@ -119,20 +133,41 @@ export const normalizeFilters = query => {
   const endDate = parseEndDate(query.end ?? query.end_date ?? query.endDate)
   const limit = parsePositiveInteger(query.limit ?? query.max_points ?? query.maxPoints)
 
+  const pathLossMin = parseNumber(query.path_loss_min ?? query.pathLossMin)
+  const pathLossMax = parseNumber(query.path_loss_max ?? query.pathLossMax)
+  const rssiMin = parseNumber(query.rssi_min ?? query.rssiMin)
+  const rssiMax = parseNumber(query.rssi_max ?? query.rssiMax)
+
   return {
     productLines,
     projects,
+    projectIds,
+    hardwareVersions,
+    wifiModules,
+    interfaces,
     standards,
     bands,
     bandwidthsMhz,
+    dataTypes,
     testReportCsvNames,
+    reportNames,
     deviceValues,
+    pathLossMin,
+    pathLossMax,
+    rssiMin,
+    rssiMax,
     productLine: productLines[0] ?? null,
     project: projects[0] ?? null,
+    projectId: projectIds[0] ?? null,
+    hardwareVersion: hardwareVersions[0] ?? null,
+    wifiModule: wifiModules[0] ?? null,
+    interface: interfaces[0] ?? null,
     standard: standards[0] ?? null,
     band: bands[0] ?? null,
     bandwidthMhz: bandwidthsMhz[0] ?? null,
+    dataType: dataTypes[0] ?? null,
     testReportCsvName: testReportCsvNames[0] ?? null,
+    reportName: reportNames[0] ?? null,
     deviceTypeRaw: requestedDeviceType,
     deviceColumn,
     deviceValue: deviceValues[0] ?? null,
@@ -171,15 +206,31 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
   }
 
   if (!exclude.includes('productLine')) {
-    addConditionForValues(conditions, params, 'd.product_line', filters.productLines)
+    addConditionForValues(conditions, params, 'pr.product_line', filters.productLines)
+  }
+
+  if (!exclude.includes('projectId')) {
+    addConditionForValues(conditions, params, 'pr.id', filters.projectIds)
   }
 
   if (!exclude.includes('project')) {
-    addConditionForValues(conditions, params, 'd.project', filters.projects)
+    addConditionForValues(conditions, params, 'pr.project_name', filters.projects)
+  }
+
+  if (!exclude.includes('hardwareVersion')) {
+    addConditionForValues(conditions, params, 'pr.hardware_version', filters.hardwareVersions)
+  }
+
+  if (!exclude.includes('wifiModule')) {
+    addConditionForValues(conditions, params, 'pr.wifi_module', filters.wifiModules)
+  }
+
+  if (!exclude.includes('interface')) {
+    addConditionForValues(conditions, params, 'pr.interface', filters.interfaces)
   }
 
   if (!exclude.includes('device') && filters.deviceColumn) {
-    addConditionForValues(conditions, params, `d.${filters.deviceColumn}`, filters.deviceValues)
+    addConditionForValues(conditions, params, `e.${filters.deviceColumn}`, filters.deviceValues)
   }
 
   if (!exclude.includes('standard')) {
@@ -194,8 +245,33 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
     addConditionForValues(conditions, params, 'p.bandwidth_mhz', filters.bandwidthsMhz)
   }
 
+  if (!exclude.includes('dataType')) {
+    addConditionForValues(conditions, params, 'p.data_type', filters.dataTypes)
+  }
+
+  if (!exclude.includes('pathLoss') && filters.pathLossMin != null) {
+    conditions.push('p.path_loss_db >= ?')
+    params.push(filters.pathLossMin)
+  }
+
+  if (!exclude.includes('pathLoss') && filters.pathLossMax != null) {
+    conditions.push('p.path_loss_db <= ?')
+    params.push(filters.pathLossMax)
+  }
+
+  if (!exclude.includes('rssi') && filters.rssiMin != null) {
+    conditions.push('p.rssi >= ?')
+    params.push(filters.rssiMin)
+  }
+
+  if (!exclude.includes('rssi') && filters.rssiMax != null) {
+    conditions.push('p.rssi <= ?')
+    params.push(filters.rssiMax)
+  }
+
   if (!exclude.includes('testReport')) {
-    addConditionForValues(conditions, params, 'tr.csv_name', filters.testReportCsvNames)
+    addConditionForValues(conditions, params, 'e.csv_name', filters.testReportCsvNames)
+    addConditionForValues(conditions, params, 'tr.report_name', filters.reportNames)
   }
 
   if (!exclude.includes('startDate') && filters.startDate) {
@@ -219,15 +295,31 @@ export const buildTestReportConditions = (filters, { exclude = [] } = {}) => {
   let requiresPerformanceJoin = false
 
   if (!exclude.includes('productLine')) {
-    addConditionForValues(conditions, params, 'd.product_line', filters.productLines)
+    addConditionForValues(conditions, params, 'pr.product_line', filters.productLines)
+  }
+
+  if (!exclude.includes('projectId')) {
+    addConditionForValues(conditions, params, 'pr.id', filters.projectIds)
   }
 
   if (!exclude.includes('project')) {
-    addConditionForValues(conditions, params, 'd.project', filters.projects)
+    addConditionForValues(conditions, params, 'pr.project_name', filters.projects)
+  }
+
+  if (!exclude.includes('hardwareVersion')) {
+    addConditionForValues(conditions, params, 'pr.hardware_version', filters.hardwareVersions)
+  }
+
+  if (!exclude.includes('wifiModule')) {
+    addConditionForValues(conditions, params, 'pr.wifi_module', filters.wifiModules)
+  }
+
+  if (!exclude.includes('interface')) {
+    addConditionForValues(conditions, params, 'pr.interface', filters.interfaces)
   }
 
   if (!exclude.includes('device') && filters.deviceColumn) {
-    addConditionForValues(conditions, params, `d.${filters.deviceColumn}`, filters.deviceValues)
+    addConditionForValues(conditions, params, `e.${filters.deviceColumn}`, filters.deviceValues)
   }
 
   if (!exclude.includes('standard')) {
@@ -249,7 +341,8 @@ export const buildTestReportConditions = (filters, { exclude = [] } = {}) => {
   }
 
   if (!exclude.includes('testReport')) {
-    addConditionForValues(conditions, params, 'tr.csv_name', filters.testReportCsvNames)
+    addConditionForValues(conditions, params, 'e.csv_name', filters.testReportCsvNames)
+    addConditionForValues(conditions, params, 'tr.report_name', filters.reportNames)
   }
 
   if (!exclude.includes('startDate') && filters.startDate) {
@@ -266,4 +359,3 @@ export const buildTestReportConditions = (filters, { exclude = [] } = {}) => {
 
   return { conditions, params, requiresPerformanceJoin }
 }
-

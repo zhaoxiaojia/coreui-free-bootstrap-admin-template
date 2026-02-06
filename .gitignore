@@ -43,3 +43,7 @@ Thumbs.db
 # Folders to ignore
 /node_modules/
 /dist/
+
+# Local env files (secrets)
+.env
+.env.*

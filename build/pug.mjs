@@ -46,7 +46,11 @@ const compile = (filename, basedir) => {
 
 const compilePugToHtml = (file, dest) => {
   const dir = dirname(file)
-  const filename = basename(file).replace('.pug', '.html')
+  const inputName = basename(file)
+  let filename = inputName.replace('.pug', '.html')
+  if (inputName === 'index.pug') {
+    filename = 'dashboard.html'
+  }
   const relative = path.relative(path.join(__dirname, '..'), dir.replace(SRC, ''))
   const html = compile(path.join(__dirname, '..', SRC, file), `${relative}`)
 

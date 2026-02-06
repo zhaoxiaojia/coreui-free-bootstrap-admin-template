@@ -2,7 +2,6 @@ import { Router } from 'express'
 import pool from '../db.mjs'
 import {
   allowedDeviceOptions,
-  buildDutConditions,
   buildPerformanceConditions,
   buildTestReportConditions,
   normalizeFilters
@@ -17,26 +16,60 @@ router.get('/', async (req, res, next) => {
     const connection = await pool.getConnection()
     try {
       const [productLines] = await connection.query(
-        'SELECT DISTINCT product_line FROM dut WHERE product_line IS NOT NULL ORDER BY product_line'
+        'SELECT DISTINCT product_line FROM project WHERE product_line IS NOT NULL ORDER BY product_line'
       )
 
-      const projectFilter = buildDutConditions(filters, { exclude: ['project'] })
-      let projectQuery = 'SELECT DISTINCT project FROM dut WHERE project IS NOT NULL'
-      if (projectFilter.conditions.length > 0) {
-        projectQuery += ` AND ${projectFilter.conditions.join(' AND ')}`
+      const [wifiModules] = await connection.query(
+        'SELECT DISTINCT wifi_module AS value FROM project WHERE wifi_module IS NOT NULL ORDER BY wifi_module'
+      )
+
+      const [interfaces] = await connection.query(
+        'SELECT DISTINCT interface AS value FROM project WHERE interface IS NOT NULL ORDER BY interface'
+      )
+
+      const projectParams = []
+      const projectConditions = ['pr.project_name IS NOT NULL']
+      if (filters.productLines.length > 0) {
+        const placeholders = filters.productLines.map(() => '?').join(', ')
+        projectConditions.push(`pr.product_line IN (${placeholders})`)
+        projectParams.push(...filters.productLines)
       }
-      projectQuery += ' ORDER BY project'
-      const [projects] = await connection.query(projectQuery, projectFilter.params)
+      let projectQuery = `
+        SELECT DISTINCT
+          pr.id,
+          pr.brand,
+          pr.product_line,
+          pr.project_name
+        FROM project pr
+        WHERE ${projectConditions.join(' AND ')}
+        ORDER BY pr.project_name
+      `
+      const [projects] = await connection.query(projectQuery, projectParams)
 
       const deviceResults = {}
       for (const deviceColumn of allowedDeviceOptions) {
-        const deviceFilter = buildDutConditions(filters, { exclude: ['device'] })
-        let deviceQuery = `SELECT DISTINCT ${deviceColumn} AS value FROM dut WHERE ${deviceColumn} IS NOT NULL`
-        if (deviceFilter.conditions.length > 0) {
-          deviceQuery += ` AND ${deviceFilter.conditions.join(' AND ')}`
+        const deviceParams = []
+        const deviceConditions = [`e.${deviceColumn} IS NOT NULL`]
+        if (filters.productLines.length > 0) {
+          const placeholders = filters.productLines.map(() => '?').join(', ')
+          deviceConditions.push(`pr.product_line IN (${placeholders})`)
+          deviceParams.push(...filters.productLines)
         }
-        deviceQuery += ` ORDER BY ${deviceColumn}`
-        const [rows] = await connection.query(deviceQuery, deviceFilter.params)
+        if (filters.projects.length > 0) {
+          const placeholders = filters.projects.map(() => '?').join(', ')
+          deviceConditions.push(`pr.project_name IN (${placeholders})`)
+          deviceParams.push(...filters.projects)
+        }
+
+        let deviceQuery = `
+          SELECT DISTINCT e.${deviceColumn} AS value
+          FROM execution e
+          INNER JOIN test_report tr ON tr.id = e.test_report_id
+          INNER JOIN project pr ON pr.id = tr.project_id
+          WHERE ${deviceConditions.join(' AND ')}
+          ORDER BY e.${deviceColumn}
+        `
+        const [rows] = await connection.query(deviceQuery, deviceParams)
         deviceResults[deviceColumn] = rows.map(row => row.value)
       }
 
@@ -44,8 +77,9 @@ router.get('/', async (req, res, next) => {
       let standardQuery = `
         SELECT DISTINCT p.standard AS value
         FROM performance p
-        INNER JOIN test_report tr ON tr.id = p.test_report_id
-        INNER JOIN dut d ON d.id = tr.dut_id
+        INNER JOIN execution e ON e.id = p.execution_id
+        INNER JOIN test_report tr ON tr.id = e.test_report_id
+        INNER JOIN project pr ON pr.id = tr.project_id
         WHERE p.standard IS NOT NULL
       `
       if (standardFilter.conditions.length > 0) {
@@ -58,8 +92,9 @@ router.get('/', async (req, res, next) => {
       let bandQuery = `
         SELECT DISTINCT p.band AS value
         FROM performance p
-        INNER JOIN test_report tr ON tr.id = p.test_report_id
-        INNER JOIN dut d ON d.id = tr.dut_id
+        INNER JOIN execution e ON e.id = p.execution_id
+        INNER JOIN test_report tr ON tr.id = e.test_report_id
+        INNER JOIN project pr ON pr.id = tr.project_id
         WHERE p.band IS NOT NULL
       `
       if (bandFilter.conditions.length > 0) {
@@ -72,8 +107,9 @@ router.get('/', async (req, res, next) => {
       let bandwidthQuery = `
         SELECT DISTINCT p.bandwidth_mhz AS value
         FROM performance p
-        INNER JOIN test_report tr ON tr.id = p.test_report_id
-        INNER JOIN dut d ON d.id = tr.dut_id
+        INNER JOIN execution e ON e.id = p.execution_id
+        INNER JOIN test_report tr ON tr.id = e.test_report_id
+        INNER JOIN project pr ON pr.id = tr.project_id
         WHERE p.bandwidth_mhz IS NOT NULL
       `
       if (bandwidthFilter.conditions.length > 0) {
@@ -84,32 +120,66 @@ router.get('/', async (req, res, next) => {
 
       const testReportFilter = buildTestReportConditions(filters, { exclude: ['testReport'] })
       let testReportQuery = `
-        SELECT DISTINCT tr.csv_name AS value
-        FROM test_report tr
-        INNER JOIN dut d ON d.id = tr.dut_id
+        SELECT DISTINCT e.csv_name AS value
+        FROM execution e
+        INNER JOIN test_report tr ON tr.id = e.test_report_id
+        INNER JOIN project pr ON pr.id = tr.project_id
       `
       if (testReportFilter.requiresPerformanceJoin) {
         testReportQuery += `
-          INNER JOIN performance p ON p.test_report_id = tr.id
+          INNER JOIN performance p ON p.execution_id = e.id
         `
       }
       testReportQuery += `
-        WHERE tr.csv_name IS NOT NULL
+        WHERE e.csv_name IS NOT NULL
       `
       if (testReportFilter.conditions.length > 0) {
         testReportQuery += ` AND ${testReportFilter.conditions.join(' AND ')}`
       }
-      testReportQuery += ' ORDER BY tr.csv_name'
+      testReportQuery += ' ORDER BY e.csv_name'
       const [testReports] = await connection.query(testReportQuery, testReportFilter.params)
+
+      let reportNameQuery = `
+        SELECT DISTINCT tr.report_name AS value
+        FROM test_report tr
+        INNER JOIN project pr ON pr.id = tr.project_id
+        INNER JOIN execution e ON e.test_report_id = tr.id
+      `
+      if (testReportFilter.requiresPerformanceJoin) {
+        reportNameQuery += `
+          INNER JOIN performance p ON p.execution_id = e.id
+        `
+      }
+      reportNameQuery += `
+        WHERE tr.report_name IS NOT NULL
+      `
+      if (testReportFilter.conditions.length > 0) {
+        reportNameQuery += ` AND ${testReportFilter.conditions.join(' AND ')}`
+      }
+      reportNameQuery += ' ORDER BY tr.report_name'
+      const [reportNames] = await connection.query(reportNameQuery, testReportFilter.params)
 
       res.json({
         productLines: productLines.map(row => row.product_line),
-        projects: projects.map(row => row.project),
+        wifiModules: wifiModules.map(row => row.value),
+        interfaces: interfaces.map(row => row.value),
+        projects: projects.map(row => row.project_name),
+        projectOptions: projects.map(row => ({
+          value: `${row.id}`,
+          label: row.project_name,
+          id: row.id,
+          brand: row.brand,
+          productLine: row.product_line,
+          projectName: row.project_name,
+          wifiModule: row.wifi_module ?? null,
+          interface: row.interface ?? null
+        })),
         devices: deviceResults,
         standards: standards.map(row => row.value),
         bands: bands.map(row => row.value),
         bandwidths: bandwidths.map(row => row.value),
-        testReports: testReports.map(row => row.value)
+        testReports: testReports.map(row => row.value),
+        reportNames: reportNames.map(row => row.value)
       })
     } finally {
       connection.release()
