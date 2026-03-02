@@ -1001,7 +1001,7 @@
     const raw = `${value ?? ''}`.trim()
     if (!raw) return ''
     const parts = raw.split('|').map(part => part.trim()).filter(Boolean)
-    const keepKeys = new Set(['BAND', 'BANDWIDTH', 'STANDARD', 'SSID', 'CHANNEL'])
+    const keepKeys = new Set(['BAND', 'BANDWIDTH', 'BW', 'STANDARD', 'SSID', 'CHANNEL'])
     const kept = parts
       .map(part => part.split('=').map(token => token.trim()))
       .filter(([key, val]) => key && val && keepKeys.has(key.toUpperCase()))
@@ -1009,7 +1009,14 @@
         if (key.toUpperCase() === 'BANDWIDTH') return `BW=${val}`
         return `${key.toUpperCase()}=${val}`
       })
-    return kept.join(' • ')
+    return kept.join(' · ')
+  }
+
+  const parseScenarioGroupValue = (scenarioGroupKey, key) => {
+    const raw = `${scenarioGroupKey ?? ''}`
+    if (!raw) return null
+    const match = raw.match(new RegExp(`(?:^|\\|)\\s*${key}\\s*=\\s*([^|]+)`, 'i'))
+    return match?.[1]?.trim() ?? null
   }
 
   const resolveScenarioIdentity = item => {
@@ -1042,7 +1049,7 @@
 
     return {
       key: scenarioKey,
-      label: labelParts.join(' • ')
+      label: labelParts.join(' · ')
     }
   }
 
@@ -1649,6 +1656,12 @@
     section.className = 'chart-scenario d-flex flex-column gap-3'
     section.dataset.polarSection = 'rvo'
 
+    const scenarioLabel = document.createElement('div')
+    scenarioLabel.className = 'small text-body-secondary fw-semibold'
+    scenarioLabel.dataset.scenarioLabel = 'rvo'
+    scenarioLabel.style.display = 'none'
+    section.appendChild(scenarioLabel)
+
     ORDERED_DIRECTIONS.forEach(direction => {
       const directionSection = document.createElement('div')
       directionSection.className = 'chart-section'
@@ -1707,8 +1720,35 @@
     return section
   }
 
+  const resolveRvoScenarioLabel = data => {
+    const labels = Array.from(new Set((data ?? []).map(item => {
+      const compact = item.scenarioGroupKey ? formatScenarioGroupKey(item.scenarioGroupKey) : ''
+      if (compact) return compact
+      return resolveScenarioIdentity(item).label
+    }))).filter(Boolean)
+
+    if (labels.length === 1) {
+      return labels[0]
+    }
+
+    if (labels.length > 1) {
+      return `Multiple Scenarios (${labels.length})`
+    }
+
+    return ''
+  }
+
   const updateRvoCharts = data => {
-    ensurePolarSection()
+    const section = ensurePolarSection()
+    if (section) {
+      const labelNode = section.querySelector('[data-scenario-label="rvo"]')
+      if (labelNode) {
+        const label = resolveRvoScenarioLabel(data)
+        labelNode.textContent = label
+        labelNode.style.display = label ? 'block' : 'none'
+      }
+    }
+
     const palette = getColorPalette()
     const toFill = color => {
       if (!color) return 'rgba(50,31,219,0.15)'
@@ -1719,30 +1759,44 @@
     ORDERED_DIRECTIONS.forEach(direction => {
       const points = (data ?? [])
         .filter(item => normalizeDirection(item.direction) === direction)
-        .filter(item => Number.isFinite(item.angleDeg) && Number.isFinite(item.throughputAvgMbps))
+        .filter(item =>
+          Number.isFinite(item.angleDeg) &&
+          Number.isFinite(item.pathLossDb) &&
+          Number.isFinite(item.throughputAvgMbps)
+        )
 
       const angles = Array.from(new Set(points.map(item => Number(item.angleDeg)))).sort((a, b) => a - b)
       const labels = angles.map(angle => `${formatNumber(angle, 0)}°`)
 
-      const projectGroups = new Map()
+      const lossGroups = new Map()
       points.forEach(item => {
-        const key = item.project ?? 'Unknown Project'
-        if (!projectGroups.has(key)) {
-          projectGroups.set(key, new Map())
+        const channel = deriveChannelFromFrequency(item.centerFreqMhz)
+        const scenarioChannel = channel === null
+          ? Number.parseInt(parseScenarioGroupValue(item.scenarioGroupKey, 'CHANNEL') ?? '', 10)
+          : channel
+        const channelLabel = Number.isFinite(scenarioChannel) ? `CH${scenarioChannel}` : 'CH?'
+        const lossLabel = `${formatNumber(item.pathLossDb, 0)}dB`
+        const key = `${channelLabel} ${lossLabel}`
+
+        if (!lossGroups.has(key)) {
+          lossGroups.set(key, new Map())
         }
-        projectGroups.get(key).set(Number(item.angleDeg), item.throughputAvgMbps)
+        lossGroups.get(key).set(Number(item.angleDeg), item.throughputAvgMbps)
       })
 
-      const datasets = Array.from(projectGroups.entries()).map(([project, map], index) => {
+      const datasets = Array.from(lossGroups.entries())
+        .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+        .map(([label, map], index) => {
         const color = palette[index % palette.length]?.border ?? '#321fdb'
         const dataPoints = angles.map(angle => map.get(angle) ?? null)
         return {
-          label: project,
+          label,
           data: dataPoints,
           borderColor: color,
           backgroundColor: toFill(color),
           pointBackgroundColor: color,
-          fill: true
+          fill: false,
+          spanGaps: true
         }
       })
 
