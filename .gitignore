@@ -43,7 +43,8 @@ Thumbs.db
 # Folders to ignore
 /node_modules/
 /dist/
-/build/
+/build/zay559/
+/build/*.zip
 
 # Local env files (secrets)
 .env
