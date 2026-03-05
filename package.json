@@ -126,8 +126,8 @@
     "sass": "1.90.0",
     "serve": "^14.2.4",
     "shelljs": "^0.10.0",
-    "stylelint": "16.23.0",
-    "stylelint-config-twbs-bootstrap": "^16.1.0",
+    "stylelint": "15.11.0",
+    "stylelint-config-twbs-bootstrap": "12.0.0",
     "sync-directory": "^6.0.5"
   }
 }
