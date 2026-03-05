@@ -218,7 +218,8 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
   }
 
   if (!exclude.includes('hardwareVersion')) {
-    addConditionForValues(conditions, params, 'pr.hardware_version', filters.hardwareVersions)
+    // Schema note: `project.hardware_version` was removed from the latest schema.
+    // Keep parsing the filter for backward compatibility, but don't apply it.
   }
 
   if (!exclude.includes('wifiModule')) {
@@ -230,7 +231,7 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
   }
 
   if (!exclude.includes('device') && filters.deviceColumn) {
-    addConditionForValues(conditions, params, `e.${filters.deviceColumn}`, filters.deviceValues)
+    addConditionForValues(conditions, params, `d.${filters.deviceColumn}`, filters.deviceValues)
   }
 
   if (!exclude.includes('standard')) {
@@ -270,8 +271,8 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
   }
 
   if (!exclude.includes('testReport')) {
-    addConditionForValues(conditions, params, 'e.csv_name', filters.testReportCsvNames)
-    addConditionForValues(conditions, params, 'tr.report_name', filters.reportNames)
+    addConditionForValues(conditions, params, 'ex.csv_name', filters.testReportCsvNames)
+    addConditionForValues(conditions, params, 'tc.report_name', filters.reportNames)
   }
 
   if (!exclude.includes('startDate') && filters.startDate) {
@@ -307,7 +308,8 @@ export const buildTestReportConditions = (filters, { exclude = [] } = {}) => {
   }
 
   if (!exclude.includes('hardwareVersion')) {
-    addConditionForValues(conditions, params, 'pr.hardware_version', filters.hardwareVersions)
+    // Schema note: `project.hardware_version` was removed from the latest schema.
+    // Keep parsing the filter for backward compatibility, but don't apply it.
   }
 
   if (!exclude.includes('wifiModule')) {
@@ -319,7 +321,7 @@ export const buildTestReportConditions = (filters, { exclude = [] } = {}) => {
   }
 
   if (!exclude.includes('device') && filters.deviceColumn) {
-    addConditionForValues(conditions, params, `e.${filters.deviceColumn}`, filters.deviceValues)
+    addConditionForValues(conditions, params, `d.${filters.deviceColumn}`, filters.deviceValues)
   }
 
   if (!exclude.includes('standard')) {
@@ -341,8 +343,8 @@ export const buildTestReportConditions = (filters, { exclude = [] } = {}) => {
   }
 
   if (!exclude.includes('testReport')) {
-    addConditionForValues(conditions, params, 'e.csv_name', filters.testReportCsvNames)
-    addConditionForValues(conditions, params, 'tr.report_name', filters.reportNames)
+    addConditionForValues(conditions, params, 'ex.csv_name', filters.testReportCsvNames)
+    addConditionForValues(conditions, params, 'tc.report_name', filters.reportNames)
   }
 
   if (!exclude.includes('startDate') && filters.startDate) {

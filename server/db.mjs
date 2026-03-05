@@ -36,6 +36,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
   path.join(__dirname, '.env')
 ].forEach(loadEnvFile)
 
+// Backward compatibility: accept legacy DB env var names some deployments use.
+if (!process.env.DB_PASSWORD && process.env.DB_PASSWD) {
+  process.env.DB_PASSWORD = process.env.DB_PASSWD
+}
+
 const toNumber = (value, fallback) => {
   const parsed = Number.parseInt(value, 10)
   return Number.isNaN(parsed) ? fallback : parsed

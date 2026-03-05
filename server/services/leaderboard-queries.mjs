@@ -74,7 +74,7 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
 
   // Base requirements for throughput-based composite scoring.
   conditions.push('p.throughput_avg_mbps IS NOT NULL')
-  conditions.push('tr.is_golden = 1')
+  conditions.push('tc.is_golden = 1')
 
   // Scenario-specific filters (can be extended later).
   if (scenario?.filters?.pathLossMin !== undefined) {
@@ -167,9 +167,10 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
           COUNT(*) AS sample_count,
           MAX(p.created_at) AS last_updated_at
         FROM performance p
-        INNER JOIN execution e ON e.id = p.execution_id
-        INNER JOIN test_report tr ON tr.id = e.test_report_id
-        INNER JOIN project pr ON pr.id = tr.project_id
+        INNER JOIN test_run ex ON ex.id = p.execution_id
+        INNER JOIN test_case tc ON tc.id = ex.test_case_id
+        INNER JOIN project pr ON pr.id = tc.project_id
+        INNER JOIN dut d ON d.id = ex.dut_id
         WHERE ${whereClause}
         GROUP BY
           pr.id,
@@ -209,11 +210,12 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
             p.protocol,
             AVG(p.throughput_avg_mbps) AS avg_throughput_avg_mbps,
             AVG(COALESCE(p.throughput_peak_mbps, p.throughput_avg_mbps)) AS avg_throughput_peak_mbps
-          FROM performance p
-          INNER JOIN execution e ON e.id = p.execution_id
-          INNER JOIN test_report tr ON tr.id = e.test_report_id
-          INNER JOIN project pr ON pr.id = tr.project_id
-          WHERE ${whereClause}
+        FROM performance p
+        INNER JOIN test_run ex ON ex.id = p.execution_id
+        INNER JOIN test_case tc ON tc.id = ex.test_case_id
+        INNER JOIN project pr ON pr.id = tc.project_id
+        INNER JOIN dut d ON d.id = ex.dut_id
+        WHERE ${whereClause}
           GROUP BY
             pr.id,
             pr.brand,
@@ -240,6 +242,7 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
     metric: 'composite_score',
     scoring: scenario?.scoring ?? null,
     sql,
-    params: [...params, limit]
+    // `whereClause` is used twice (main + max-rank subquery), so duplicate filter params.
+    params: [...params, ...params, limit]
   }
 }

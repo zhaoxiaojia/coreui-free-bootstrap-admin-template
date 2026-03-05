@@ -47,7 +47,6 @@ router.get('/', async (req, res, next) => {
           p.path_loss_db,
           p.throughput_avg_mbps,
           p.created_at,
-          e.test_report_id,
           p.execution_id,
           p.scenario_group_key,
           p.band,
@@ -60,18 +59,19 @@ router.get('/', async (req, res, next) => {
           p.protocol,
           p.csv_name,
           p.data_type,
-          tr.report_name,
-          tr.case_path,
-          tr.project_id,
+          tc.report_name,
+          tc.case_path,
+          tc.project_id,
           pr.brand,
           pr.product_line,
           pr.project_name,
-          e.adb_device,
-          e.telnet_ip
+          d.adb_device,
+          d.telnet_ip
         FROM performance p
-        INNER JOIN execution e ON e.id = p.execution_id
-        INNER JOIN test_report tr ON tr.id = e.test_report_id
-        INNER JOIN project pr ON pr.id = tr.project_id
+        INNER JOIN test_run ex ON ex.id = p.execution_id
+        INNER JOIN test_case tc ON tc.id = ex.test_case_id
+        INNER JOIN project pr ON pr.id = tc.project_id
+        INNER JOIN dut d ON d.id = ex.dut_id
       `
       if (performanceFilter.conditions.length > 0) {
         query += ` WHERE ${performanceFilter.conditions.join(' AND ')}`
@@ -102,7 +102,6 @@ router.get('/', async (req, res, next) => {
         pathLossDb: row.path_loss_db !== null ? Number(row.path_loss_db) : null,
         throughputAvgMbps: row.throughput_avg_mbps !== null ? Number(row.throughput_avg_mbps) : null,
         createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
-        testReportId: row.test_report_id ?? null,
         executionId: row.execution_id ?? null,
         scenarioGroupKey: row.scenario_group_key ?? null,
         band: row.band ?? null,

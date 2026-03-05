@@ -51,7 +51,7 @@ router.get('/', async (req, res, next) => {
             brand: row.brand,
             productLine: row.product_line,
             projectName: row.project_name,
-            hardwareVersion: row.hardware_version,
+            hardwareVersion: null,
             score: row.score !== null ? Number(row.score) : null,
             sampleCount: row.sample_count !== null ? Number(row.sample_count) : 0,
             lastUpdatedAt: row.last_updated_at ? new Date(row.last_updated_at).toISOString() : null,
@@ -82,7 +82,7 @@ router.get('/', async (req, res, next) => {
             brand: row.brand,
             productLine: row.product_line,
             projectName: row.project_name,
-            hardwareVersion: row.hardware_version,
+            hardwareVersion: null,
             score: row.score !== null ? Number(row.score) : null,
             sampleCount: row.sample_count !== null ? Number(row.sample_count) : 0,
             lastUpdatedAt: row.last_updated_at ? new Date(row.last_updated_at).toISOString() : null,
@@ -107,7 +107,6 @@ router.get('/', async (req, res, next) => {
           pr.brand,
           pr.product_line,
           pr.project_name,
-          pr.hardware_version,
           p.standard,
           p.band,
           p.bandwidth_mhz,
@@ -117,9 +116,10 @@ router.get('/', async (req, res, next) => {
           COUNT(*) AS sample_count,
           MAX(p.created_at) AS last_updated_at
         FROM performance p
-        INNER JOIN execution e ON e.id = p.execution_id
-        INNER JOIN test_report tr ON tr.id = e.test_report_id
-        INNER JOIN project pr ON pr.id = tr.project_id
+        INNER JOIN test_run ex ON ex.id = p.execution_id
+        INNER JOIN test_case tc ON tc.id = ex.test_case_id
+        INNER JOIN project pr ON pr.id = tc.project_id
+        INNER JOIN dut d ON d.id = ex.dut_id
       `
       if (conditions.length > 0) {
         query += ` WHERE ${conditions.join(' AND ')}`
@@ -131,7 +131,6 @@ router.get('/', async (req, res, next) => {
           pr.brand,
           pr.product_line,
           pr.project_name,
-          pr.hardware_version,
           p.standard,
           p.band,
           p.bandwidth_mhz,
@@ -154,7 +153,7 @@ router.get('/', async (req, res, next) => {
           brand: row.brand,
           productLine: row.product_line,
           projectName: row.project_name,
-          hardwareVersion: row.hardware_version,
+          hardwareVersion: null,
           standard: row.standard,
           band: row.band,
           bandwidthMhz: row.bandwidth_mhz !== null ? Number(row.bandwidth_mhz) : null,

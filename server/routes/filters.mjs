@@ -49,7 +49,7 @@ router.get('/', async (req, res, next) => {
       const deviceResults = {}
       for (const deviceColumn of allowedDeviceOptions) {
         const deviceParams = []
-        const deviceConditions = [`e.${deviceColumn} IS NOT NULL`]
+        const deviceConditions = [`d.${deviceColumn} IS NOT NULL`]
         if (filters.productLines.length > 0) {
           const placeholders = filters.productLines.map(() => '?').join(', ')
           deviceConditions.push(`pr.product_line IN (${placeholders})`)
@@ -62,12 +62,13 @@ router.get('/', async (req, res, next) => {
         }
 
         let deviceQuery = `
-          SELECT DISTINCT e.${deviceColumn} AS value
-          FROM execution e
-          INNER JOIN test_report tr ON tr.id = e.test_report_id
-          INNER JOIN project pr ON pr.id = tr.project_id
+          SELECT DISTINCT d.${deviceColumn} AS value
+          FROM test_run ex
+          INNER JOIN test_case tc ON tc.id = ex.test_case_id
+          INNER JOIN project pr ON pr.id = tc.project_id
+          INNER JOIN dut d ON d.id = ex.dut_id
           WHERE ${deviceConditions.join(' AND ')}
-          ORDER BY e.${deviceColumn}
+          ORDER BY d.${deviceColumn}
         `
         const [rows] = await connection.query(deviceQuery, deviceParams)
         deviceResults[deviceColumn] = rows.map(row => row.value)
@@ -77,9 +78,10 @@ router.get('/', async (req, res, next) => {
       let standardQuery = `
         SELECT DISTINCT p.standard AS value
         FROM performance p
-        INNER JOIN execution e ON e.id = p.execution_id
-        INNER JOIN test_report tr ON tr.id = e.test_report_id
-        INNER JOIN project pr ON pr.id = tr.project_id
+        INNER JOIN test_run ex ON ex.id = p.execution_id
+        INNER JOIN test_case tc ON tc.id = ex.test_case_id
+        INNER JOIN project pr ON pr.id = tc.project_id
+        INNER JOIN dut d ON d.id = ex.dut_id
         WHERE p.standard IS NOT NULL
       `
       if (standardFilter.conditions.length > 0) {
@@ -92,9 +94,10 @@ router.get('/', async (req, res, next) => {
       let bandQuery = `
         SELECT DISTINCT p.band AS value
         FROM performance p
-        INNER JOIN execution e ON e.id = p.execution_id
-        INNER JOIN test_report tr ON tr.id = e.test_report_id
-        INNER JOIN project pr ON pr.id = tr.project_id
+        INNER JOIN test_run ex ON ex.id = p.execution_id
+        INNER JOIN test_case tc ON tc.id = ex.test_case_id
+        INNER JOIN project pr ON pr.id = tc.project_id
+        INNER JOIN dut d ON d.id = ex.dut_id
         WHERE p.band IS NOT NULL
       `
       if (bandFilter.conditions.length > 0) {
@@ -107,9 +110,10 @@ router.get('/', async (req, res, next) => {
       let bandwidthQuery = `
         SELECT DISTINCT p.bandwidth_mhz AS value
         FROM performance p
-        INNER JOIN execution e ON e.id = p.execution_id
-        INNER JOIN test_report tr ON tr.id = e.test_report_id
-        INNER JOIN project pr ON pr.id = tr.project_id
+        INNER JOIN test_run ex ON ex.id = p.execution_id
+        INNER JOIN test_case tc ON tc.id = ex.test_case_id
+        INNER JOIN project pr ON pr.id = tc.project_id
+        INNER JOIN dut d ON d.id = ex.dut_id
         WHERE p.bandwidth_mhz IS NOT NULL
       `
       if (bandwidthFilter.conditions.length > 0) {
@@ -120,43 +124,45 @@ router.get('/', async (req, res, next) => {
 
       const testReportFilter = buildTestReportConditions(filters, { exclude: ['testReport'] })
       let testReportQuery = `
-        SELECT DISTINCT e.csv_name AS value
-        FROM execution e
-        INNER JOIN test_report tr ON tr.id = e.test_report_id
-        INNER JOIN project pr ON pr.id = tr.project_id
+        SELECT DISTINCT ex.csv_name AS value
+        FROM test_run ex
+        INNER JOIN test_case tc ON tc.id = ex.test_case_id
+        INNER JOIN project pr ON pr.id = tc.project_id
+        INNER JOIN dut d ON d.id = ex.dut_id
       `
       if (testReportFilter.requiresPerformanceJoin) {
         testReportQuery += `
-          INNER JOIN performance p ON p.execution_id = e.id
+          INNER JOIN performance p ON p.execution_id = ex.id
         `
       }
       testReportQuery += `
-        WHERE e.csv_name IS NOT NULL
+        WHERE ex.csv_name IS NOT NULL
       `
       if (testReportFilter.conditions.length > 0) {
         testReportQuery += ` AND ${testReportFilter.conditions.join(' AND ')}`
       }
-      testReportQuery += ' ORDER BY e.csv_name'
+      testReportQuery += ' ORDER BY ex.csv_name'
       const [testReports] = await connection.query(testReportQuery, testReportFilter.params)
 
       let reportNameQuery = `
-        SELECT DISTINCT tr.report_name AS value
-        FROM test_report tr
-        INNER JOIN project pr ON pr.id = tr.project_id
-        INNER JOIN execution e ON e.test_report_id = tr.id
+        SELECT DISTINCT tc.report_name AS value
+        FROM test_case tc
+        INNER JOIN project pr ON pr.id = tc.project_id
+        INNER JOIN test_run ex ON ex.test_case_id = tc.id
+        INNER JOIN dut d ON d.id = ex.dut_id
       `
       if (testReportFilter.requiresPerformanceJoin) {
         reportNameQuery += `
-          INNER JOIN performance p ON p.execution_id = e.id
+          INNER JOIN performance p ON p.execution_id = ex.id
         `
       }
       reportNameQuery += `
-        WHERE tr.report_name IS NOT NULL
+        WHERE tc.report_name IS NOT NULL
       `
       if (testReportFilter.conditions.length > 0) {
         reportNameQuery += ` AND ${testReportFilter.conditions.join(' AND ')}`
       }
-      reportNameQuery += ' ORDER BY tr.report_name'
+      reportNameQuery += ' ORDER BY tc.report_name'
       const [reportNames] = await connection.query(reportNameQuery, testReportFilter.params)
 
       res.json({
