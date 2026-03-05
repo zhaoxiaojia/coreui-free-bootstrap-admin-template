@@ -2,6 +2,8 @@
 
 import express from 'express'
 import cors from 'cors'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import pool from './db.mjs'
 import filtersRouter from './routes/filters.mjs'
 import performanceRouter from './routes/performance.mjs'
@@ -28,6 +30,17 @@ app.use('/api/performance', performanceRouter)
 app.use('/api/leaderboard', leaderboardRouter)
 app.use('/api/leaderboard-scenarios', leaderboardScenariosRouter)
 
+const shouldServeStatic = ['1', 'true', 'yes', 'on'].includes(String(process.env.SERVE_STATIC ?? '').toLowerCase())
+if (shouldServeStatic) {
+  const __filename = fileURLToPath(import.meta.url)
+  const __dirname = path.dirname(__filename)
+  const staticDir = process.env.STATIC_DIR
+    ? path.resolve(process.env.STATIC_DIR)
+    : path.resolve(__dirname, '..', 'dist')
+
+  app.use(express.static(staticDir))
+}
+
 app.use((err, req, res, next) => {
   console.error('API error', err)
   const includeDetails = (process.env.NODE_ENV ?? '').toLowerCase() !== 'production'
@@ -43,8 +56,10 @@ app.use((err, req, res, next) => {
   })
 })
 
-const port = Number.parseInt(process.env.API_PORT ?? process.env.PORT ?? '5000', 10)
+const defaultPort = shouldServeStatic ? '3000' : '5000'
+const port = Number.parseInt(process.env.API_PORT ?? process.env.PORT ?? defaultPort, 10)
 
 app.listen(port, () => {
-  console.log(`API server listening on http://localhost:${port}`)
+  console.log(`Server listening on http://localhost:${port}`)
+  if (shouldServeStatic) console.log('Static files served from dist/ (set STATIC_DIR to override)')
 })

@@ -51,6 +51,7 @@
   ],
   "scripts": {
     "api": "node server/index.mjs",
+    "serve:server": "cross-env SERVE_STATIC=true PORT=3000 node server/index.mjs",
     "build": "npm-run-all clean --parallel css js sync --sequential build-vendors",
     "build-vendors": "node build/vendors.mjs",
     "clean": "rimraf dist",
