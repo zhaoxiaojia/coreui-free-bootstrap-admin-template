@@ -9,7 +9,8 @@
  */
 
 (() => {
-  const API_BASE = window.WIFI_DASHBOARD_API_BASE ?? 'http://localhost:5000/api'
+  const DEFAULT_API_BASE = new URL('/api', window.location.origin).toString()
+  const API_BASE = window.WIFI_DASHBOARD_API_BASE ?? DEFAULT_API_BASE
   const DEFAULT_LIMIT = Number.parseInt(window.WIFI_DASHBOARD_MAX_POINTS ?? '1000', 10)
   const FILTER_PROMPT_MESSAGE = 'Choose filters and click "Apply Filters" to run the query.'
 

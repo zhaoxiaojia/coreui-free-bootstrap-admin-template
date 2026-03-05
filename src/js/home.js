@@ -1,5 +1,6 @@
 (() => {
-  const API_BASE = window.WIFI_API_BASE ?? window.WIFI_DASHBOARD_API_BASE ?? 'http://localhost:5000/api'
+  const DEFAULT_API_BASE = new URL('/api', window.location.origin).toString()
+  const API_BASE = window.WIFI_API_BASE ?? window.WIFI_DASHBOARD_API_BASE ?? DEFAULT_API_BASE
 
   const elements = {
     projectsGrid: document.getElementById('projectsGrid'),
