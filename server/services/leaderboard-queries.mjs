@@ -101,128 +101,136 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
   const standardWeight = standardWeightSql(weights)
   const defaultEfficiency = protocolEfficiencySql(weights, 'p.protocol')
   const theoreticalPhyRate = theoreticalPhyRateSql(weights, 'p.standard', 'p.bandwidth_mhz')
-  const p95 = Number(weights.theoreticalCeiling?.percentile ?? 0.95)
   const whereClause = conditions.length ? conditions.join(' AND ') : '1=1'
 
   const sql = `
-    WITH efficiency_samples AS (
-      SELECT
-        p.protocol,
-        (${theoreticalPhyRate}) AS theoretical_phy_rate_mbps,
-        LEAST(
-          1,
-          GREATEST(0, (p.throughput_avg_mbps / NULLIF((${theoreticalPhyRate}), 0)))
-        ) AS eff
-      FROM performance p
-      INNER JOIN execution e ON e.id = p.execution_id
-      INNER JOIN test_report tr ON tr.id = e.test_report_id
-      INNER JOIN project pr ON pr.id = tr.project_id
-      WHERE ${whereClause}
-        AND (${theoreticalPhyRate}) IS NOT NULL AND (${theoreticalPhyRate}) > 0
-        AND p.throughput_avg_mbps IS NOT NULL
-    ),
-    eff_ranked AS (
-      SELECT
-        protocol,
-        eff,
-        ROW_NUMBER() OVER (PARTITION BY protocol ORDER BY eff) AS rn,
-        COUNT(*) OVER (PARTITION BY protocol) AS cnt
-      FROM efficiency_samples
-      WHERE eff IS NOT NULL
-    ),
-    protocol_eff AS (
-      SELECT
-        protocol,
-        eff AS eff_p95
-      FROM eff_ranked
-      WHERE rn = GREATEST(1, CEIL(${p95} * cnt))
-    ),
-    group_scores AS (
-      SELECT
-        pr.id AS project_id,
-        pr.brand,
-        pr.product_line,
-        pr.project_name,
-        NULL AS hardware_version,
-        p.standard,
-        p.band,
-        p.bandwidth_mhz,
-        p.protocol,
-        AVG(p.throughput_avg_mbps) AS avg_throughput_avg_mbps,
-        AVG(COALESCE(p.throughput_peak_mbps, p.throughput_avg_mbps)) AS avg_throughput_peak_mbps,
-        MAX((${theoreticalPhyRate})) AS theoretical_phy_rate_mbps,
-        COALESCE(MAX(pe.eff_p95), (${defaultEfficiency})) AS protocol_efficiency,
-        COUNT(*) AS sample_count,
-        MAX(p.created_at) AS last_updated_at
-      FROM performance p
-      INNER JOIN execution e ON e.id = p.execution_id
-      INNER JOIN test_report tr ON tr.id = e.test_report_id
-      INNER JOIN project pr ON pr.id = tr.project_id
-      LEFT JOIN protocol_eff pe ON pe.protocol = p.protocol
-      WHERE ${whereClause}
-      GROUP BY
-        pr.id,
-        pr.brand,
-        pr.product_line,
-        pr.project_name,
-        p.standard,
-        p.band,
-        p.bandwidth_mhz,
-        p.protocol
-    ),
-    project_scores AS (
-      SELECT
-        project_id,
-        brand,
-        product_line,
-        project_name,
-        NULL AS hardware_version,
-        SUM(
-          (${protocolWeight}) * (${bandWeight}) * (${standardWeight}) *
-          (${weights.throughput.avg} * avg_throughput_avg_mbps + ${weights.throughput.peak} * avg_throughput_peak_mbps)
-        ) / NULLIF(SUM(
-          (${protocolWeight}) * (${bandWeight}) * (${standardWeight})
-        ), 0) AS composite_raw,
-        SUM(
-          (${protocolWeight}) * (${bandWeight}) * (${standardWeight}) *
-          (theoretical_phy_rate_mbps * protocol_efficiency)
-        ) / NULLIF(SUM(
-          (${protocolWeight}) * (${bandWeight}) * (${standardWeight})
-        ), 0) AS theoretical_ceiling_mbps,
-        SUM(sample_count) AS sample_count,
-        MAX(last_updated_at) AS last_updated_at
-      FROM group_scores
-      GROUP BY
-        project_id,
-        brand,
-        product_line,
-        project_name
-    )
     SELECT
-      project_id,
-      brand,
-      product_line,
-      project_name,
+      ps.project_id,
+      ps.brand,
+      ps.product_line,
+      ps.project_name,
       NULL AS hardware_version,
-      sample_count,
-      last_updated_at,
+      ps.sample_count,
+      ps.last_updated_at,
       ROUND(
         LEAST(
           1,
           GREATEST(
             0,
             COALESCE(
-              (composite_raw / NULLIF(theoretical_ceiling_mbps, 0)),
-              (composite_raw / NULLIF(MAX(composite_raw) OVER (), 0))
+              (ps.composite_raw / NULLIF(ps.theoretical_ceiling_mbps, 0)),
+              (ps.composite_raw / NULLIF(mx.max_composite_raw, 0))
             )
           )
         ) *
-        (${weights.sampleFactor.base} + ${weights.sampleFactor.extra} * LEAST(1, LOG10(sample_count + 1) / LOG10(${weights.sampleFactor.fullSamples} + 1))) *
+        (${weights.sampleFactor.base} + ${weights.sampleFactor.extra} * LEAST(1, LOG10(ps.sample_count + 1) / LOG10(${weights.sampleFactor.fullSamples} + 1))) *
         ${weights.scoreScale}
       ) AS score,
-      composite_raw,
-      theoretical_ceiling_mbps
-    FROM project_scores
+      ps.composite_raw,
+      ps.theoretical_ceiling_mbps
+    FROM (
+      SELECT
+        gs.project_id,
+        gs.brand,
+        gs.product_line,
+        gs.project_name,
+        NULL AS hardware_version,
+        SUM(
+          (${protocolWeight}) * (${bandWeight}) * (${standardWeight}) *
+          (${weights.throughput.avg} * gs.avg_throughput_avg_mbps + ${weights.throughput.peak} * gs.avg_throughput_peak_mbps)
+        ) / NULLIF(SUM(
+          (${protocolWeight}) * (${bandWeight}) * (${standardWeight})
+        ), 0) AS composite_raw,
+        SUM(
+          (${protocolWeight}) * (${bandWeight}) * (${standardWeight}) *
+          (gs.theoretical_phy_rate_mbps * gs.protocol_efficiency)
+        ) / NULLIF(SUM(
+          (${protocolWeight}) * (${bandWeight}) * (${standardWeight})
+        ), 0) AS theoretical_ceiling_mbps,
+        SUM(gs.sample_count) AS sample_count,
+        MAX(gs.last_updated_at) AS last_updated_at
+      FROM (
+        SELECT
+          pr.id AS project_id,
+          pr.brand,
+          pr.product_line,
+          pr.project_name,
+          NULL AS hardware_version,
+          p.standard,
+          p.band,
+          p.bandwidth_mhz,
+          p.protocol,
+          AVG(p.throughput_avg_mbps) AS avg_throughput_avg_mbps,
+          AVG(COALESCE(p.throughput_peak_mbps, p.throughput_avg_mbps)) AS avg_throughput_peak_mbps,
+          MAX((${theoreticalPhyRate})) AS theoretical_phy_rate_mbps,
+          (${defaultEfficiency}) AS protocol_efficiency,
+          COUNT(*) AS sample_count,
+          MAX(p.created_at) AS last_updated_at
+        FROM performance p
+        INNER JOIN execution e ON e.id = p.execution_id
+        INNER JOIN test_report tr ON tr.id = e.test_report_id
+        INNER JOIN project pr ON pr.id = tr.project_id
+        WHERE ${whereClause}
+        GROUP BY
+          pr.id,
+          pr.brand,
+          pr.product_line,
+          pr.project_name,
+          p.standard,
+          p.band,
+          p.bandwidth_mhz,
+          p.protocol
+      ) gs
+      GROUP BY
+        gs.project_id,
+        gs.brand,
+        gs.product_line,
+        gs.project_name
+    ) ps
+    CROSS JOIN (
+      SELECT MAX(composite_raw) AS max_composite_raw
+      FROM (
+        SELECT
+          SUM(
+            (${protocolWeight}) * (${bandWeight}) * (${standardWeight}) *
+            (${weights.throughput.avg} * gs.avg_throughput_avg_mbps + ${weights.throughput.peak} * gs.avg_throughput_peak_mbps)
+          ) / NULLIF(SUM(
+            (${protocolWeight}) * (${bandWeight}) * (${standardWeight})
+          ), 0) AS composite_raw
+        FROM (
+          SELECT
+            pr.id AS project_id,
+            pr.brand,
+            pr.product_line,
+            pr.project_name,
+            p.standard,
+            p.band,
+            p.bandwidth_mhz,
+            p.protocol,
+            AVG(p.throughput_avg_mbps) AS avg_throughput_avg_mbps,
+            AVG(COALESCE(p.throughput_peak_mbps, p.throughput_avg_mbps)) AS avg_throughput_peak_mbps
+          FROM performance p
+          INNER JOIN execution e ON e.id = p.execution_id
+          INNER JOIN test_report tr ON tr.id = e.test_report_id
+          INNER JOIN project pr ON pr.id = tr.project_id
+          WHERE ${whereClause}
+          GROUP BY
+            pr.id,
+            pr.brand,
+            pr.product_line,
+            pr.project_name,
+            p.standard,
+            p.band,
+            p.bandwidth_mhz,
+            p.protocol
+        ) gs
+        GROUP BY
+          gs.project_id,
+          gs.brand,
+          gs.product_line,
+          gs.project_name
+      ) ranked
+    ) mx
     ORDER BY score DESC, last_updated_at DESC
     LIMIT ?
   `
@@ -232,7 +240,6 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
     metric: 'composite_score',
     scoring: scenario?.scoring ?? null,
     sql,
-    // `whereClause` is used twice (efficiency + group scores), so duplicate filter params.
-    params: [...params, ...params, limit]
+    params: [...params, limit]
   }
 }
