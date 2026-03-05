@@ -2,6 +2,7 @@
 
 import express from 'express'
 import cors from 'cors'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pool from './db.mjs'
@@ -37,6 +38,21 @@ if (shouldServeStatic) {
   const staticDir = process.env.STATIC_DIR
     ? path.resolve(process.env.STATIC_DIR)
     : path.resolve(__dirname, '..', 'dist')
+
+  app.get('*', (req, res, next) => {
+    if (req.method !== 'GET') return next()
+    if (req.path.startsWith('/api/')) return next()
+    if (path.posix.extname(req.path)) return next()
+
+    const requestedPath = req.path === '/' ? '/index' : req.path
+    const candidatePath = path.join(staticDir, `${requestedPath}.html`)
+
+    if (!candidatePath.startsWith(staticDir)) return next()
+    if (!fs.existsSync(candidatePath)) return next()
+
+    const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''
+    res.redirect(302, `${requestedPath}.html${qs}`)
+  })
 
   app.use(express.static(staticDir))
 }
