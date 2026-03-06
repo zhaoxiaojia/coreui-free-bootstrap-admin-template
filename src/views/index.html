@@ -255,6 +255,81 @@
       </a>
     </div>
 
+    <section class="py-4">
+      <div class="container">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h2 class="h2 mb-0">Reports</h2>
+          <div class="small text-muted">Find by ID or name</div>
+        </div>
+
+        <div class="lb-card rounded-3 p-3 bg-white">
+          <form id="reportFinderForm" class="row g-2 align-items-center position-relative" autocomplete="off">
+            <div class="col-12 col-md-auto" style="min-width: 210px;">
+              <select class="form-select" id="reportFinderProject" aria-label="Project filter">
+                <option value="">Projects: All</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-auto" style="min-width: 160px;">
+              <select class="form-select" id="reportFinderReportType" aria-label="Report type filter">
+                <option value="">Type: All</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-auto" style="min-width: 160px;">
+              <select class="form-select" id="reportFinderBrand" aria-label="Brand filter">
+                <option value="">Brand: All</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-auto" style="min-width: 160px;">
+              <select class="form-select" id="reportFinderProductLine" aria-label="Product line filter">
+                <option value="">Product Line: All</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-auto" style="min-width: 160px;">
+              <select class="form-select" id="reportFinderMainChip" aria-label="Main chip filter">
+                <option value="">Main Chip: All</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-auto" style="min-width: 160px;">
+              <select class="form-select" id="reportFinderWifiModule" aria-label="Wi-Fi module filter">
+                <option value="">Wi-Fi Module: All</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-auto" style="min-width: 160px;">
+              <select class="form-select" id="reportFinderInterface" aria-label="Interface filter">
+                <option value="">Interface: All</option>
+              </select>
+            </div>
+            <div class="col-12 col-md">
+              <input class="form-control" id="reportFinderQuery" name="q" placeholder="Contains text (report_id / csv_name / data_type)" type="search">
+              <div class="list-group position-absolute start-0 top-100 w-100 mt-2 shadow-sm d-none" id="reportFinderResults" style="z-index: 10;"></div>
+            </div>
+            <div class="col-12 col-md-auto d-flex gap-2">
+              <button class="btn btn-success" type="submit">Search</button>
+              <button class="btn btn-outline-secondary" type="button" id="reportFinderReset">Reset</button>
+            </div>
+          </form>
+          <div class="mt-2" id="reportFinderSelectedFilters"></div>
+        </div>
+
+        <div class="row g-3 mt-1">
+          <div class="col-12">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <div class="fw-semibold leaderboard-title">Recent uploads</div>
+              <div class="small text-muted">Latest reports</div>
+            </div>
+            <div id="reportFinderRecentGrid"></div>
+          </div>
+          <div class="col-12">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <div class="fw-semibold leaderboard-title">Frequently viewed</div>
+              <div class="small text-muted">Based on this browser</div>
+            </div>
+            <div id="reportFinderFrequentGrid"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="py-5">
       <div class="container">
         <div class="d-flex align-items-center justify-content-between mb-3">
@@ -321,5 +396,6 @@
 
     <script src="assets/zay559/js/bootstrap.bundle.min.js"></script>
     <script src="js/home.js"></script>
+    <script src="js/report-finder.js"></script>
   </body>
 </html>

@@ -27,6 +27,26 @@ router.get('/', async (req, res, next) => {
         'SELECT DISTINCT interface AS value FROM project WHERE interface IS NOT NULL ORDER BY interface'
       )
 
+      const [brands] = await connection.query(
+        'SELECT DISTINCT brand AS value FROM project WHERE brand IS NOT NULL ORDER BY brand'
+      )
+
+      const [mainChips] = await connection.query(
+        'SELECT DISTINCT main_chip AS value FROM project WHERE main_chip IS NOT NULL ORDER BY main_chip'
+      )
+
+      const [ecosystems] = await connection.query(
+        'SELECT DISTINCT ecosystem AS value FROM project WHERE ecosystem IS NOT NULL ORDER BY ecosystem'
+      )
+
+      const [massProductionStatuses] = await connection.query(
+        'SELECT DISTINCT mass_production_status AS value FROM project WHERE mass_production_status IS NOT NULL ORDER BY mass_production_status'
+      )
+
+      const [dutConnectTypes] = await connection.query(
+        'SELECT DISTINCT connect_type AS value FROM dut WHERE connect_type IS NOT NULL ORDER BY connect_type'
+      )
+
       const projectParams = []
       const projectConditions = ['pr.project_name IS NOT NULL']
       if (filters.productLines.length > 0) {
@@ -167,6 +187,11 @@ router.get('/', async (req, res, next) => {
 
       res.json({
         productLines: productLines.map(row => row.product_line),
+        brands: brands.map(row => row.value),
+        mainChips: mainChips.map(row => row.value),
+        ecosystems: ecosystems.map(row => row.value),
+        massProductionStatuses: massProductionStatuses.map(row => row.value),
+        dutConnectTypes: dutConnectTypes.map(row => row.value),
         wifiModules: wifiModules.map(row => row.value),
         interfaces: interfaces.map(row => row.value),
         projects: projects.map(row => row.project_name),

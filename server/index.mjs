@@ -10,6 +10,7 @@ import filtersRouter from './routes/filters.mjs'
 import performanceRouter from './routes/performance.mjs'
 import leaderboardRouter from './routes/leaderboard.mjs'
 import leaderboardScenariosRouter from './routes/leaderboard-scenarios.mjs'
+import reportsRouter from './routes/reports.mjs'
 
 const app = express()
 
@@ -30,6 +31,7 @@ app.use('/api/filters', filtersRouter)
 app.use('/api/performance', performanceRouter)
 app.use('/api/leaderboard', leaderboardRouter)
 app.use('/api/leaderboard-scenarios', leaderboardScenariosRouter)
+app.use('/api/reports', reportsRouter)
 
 const shouldServeStatic = ['1', 'true', 'yes', 'on'].includes(String(process.env.SERVE_STATIC ?? '').toLowerCase())
 if (shouldServeStatic) {

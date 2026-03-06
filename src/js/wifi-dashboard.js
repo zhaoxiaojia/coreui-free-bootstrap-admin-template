@@ -19,8 +19,6 @@
   const projectSelect = document.getElementById('filterProject')
   const testReportSelect = document.getElementById('filterTestReport')
   const standardSelect = document.getElementById('filterStandard')
-  const bandSelect = document.getElementById('filterBand')
-  const bandwidthSelect = document.getElementById('filterBandwidth')
   const deviceTypeSelect = document.getElementById('filterDeviceType')
   const deviceValueSelect = document.getElementById('filterDeviceValue')
   const startDateInput = document.getElementById('filterStartDate')
@@ -44,6 +42,8 @@
   const slaPassTrendEl = document.getElementById('slaPassTrend')
   const slaPassChangeEl = document.getElementById('slaPassChange')
   const lastUpdatedEl = document.getElementById('lastUpdated')
+  const selectedFilesList = document.getElementById('selectedFilesList')
+  const selectedFilesCount = document.getElementById('selectedFilesCount')
   const scenarioSections = new Map()
   const chartInstances = new Map()
   const chartEmptyStates = new Map()
@@ -55,6 +55,17 @@
     { value: 'RVO', label: 'RVO' }
   ]
   let selectedDataType = 'PEAK_THROUGHPUT'
+
+  const getSelectedDataTypeFromUrl = () => {
+    const params = new URLSearchParams(window.location.search)
+    const raw = params.get('datatype') ?? params.get('dataType') ?? params.get('type')
+    if (!raw) return null
+    const normalized = raw.toUpperCase()
+    if (DATA_TYPE_OPTIONS.some(option => option.value === normalized)) {
+      return normalized
+    }
+    return null
+  }
 
   let latestDataset = []
   let isLoading = false
@@ -1092,8 +1103,6 @@
       project: getSelectedValues(projectSelect),
       test_report_csv_name: testReportSelect ? getSelectedValues(testReportSelect) : [],
       standard: getSelectedValues(standardSelect),
-      band: getSelectedValues(bandSelect),
-      bandwidth_mhz: getSelectedValues(bandwidthSelect),
       data_type: selectedDataType,
       device_type: deviceTypeSelect.value || '',
       device_value: getSelectedValues(deviceValueSelect),
@@ -1101,6 +1110,32 @@
       end_date: endDateInput.value || '',
       limit: DEFAULT_LIMIT
     }
+  }
+
+  const escapeHtml = value =>
+    `${value ?? ''}`
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;')
+
+  const renderSelectedFiles = (files, { placeholder = 'No matching files.' } = {}) => {
+    if (!selectedFilesList) return
+
+    const resolved = Array.from(new Set((files ?? []).map(item => `${item ?? ''}`.trim()).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+
+    if (selectedFilesCount) selectedFilesCount.textContent = `${resolved.length}`
+
+    if (resolved.length === 0) {
+      selectedFilesList.innerHTML = `<li class="list-group-item bg-transparent text-muted">${escapeHtml(placeholder)}</li>`
+      return
+    }
+
+    selectedFilesList.innerHTML = resolved
+      .map(name => `<li class="list-group-item bg-transparent text-truncate" title="${escapeHtml(name)}">${escapeHtml(name)}</li>`)
+      .join('')
   }
 
   const buildQueryString = filters => {
@@ -1177,20 +1212,6 @@
       const selectedValue = previousValues.find(value => normalizedOptions.some(option => option.value === value))
       element.value = selectedValue ?? ''
     }
-  }
-
-  const populateBandwidthSelect = (values, placeholder) => {
-    const numericValues = (values ?? [])
-      .map(value => Number(value))
-      .filter(value => Number.isFinite(value))
-      .sort((a, b) => a - b)
-
-    const formatted = numericValues.map(value => ({
-      value: value.toString(),
-      label: `${value} MHz`
-    }))
-
-    populateSelect(bandwidthSelect, formatted, placeholder)
   }
 
   const refreshDeviceValueOptions = deviceOptions => {
@@ -1930,14 +1951,11 @@
           populateSelect(testReportSelect, filterOptions.testReports ?? [], 'All Test Reports')
         }
         populateSelect(standardSelect, filterOptions.standards, 'All Standards')
-        populateSelect(
-          bandSelect,
-          filterOptions.bands,
-          'All Bands',
-          value => formatBand(value) || value
-        )
-        populateBandwidthSelect(filterOptions.bandwidths ?? [], 'All Bandwidths')
         refreshDeviceValueOptions(filterOptions.devices ?? {})
+
+        const selected = testReportSelect ? getSelectedValues(testReportSelect) : []
+        const filesToShow = selected.length > 0 ? selected : (filterOptions.testReports ?? [])
+        renderSelectedFiles(filesToShow, { placeholder: 'No matching files.' })
         isSyncingFilters = false
       }
 
@@ -1945,6 +1963,7 @@
         const { data, metadata } = await fetchPerformanceData()
         latestDataset = data
         updateVisualization(data)
+        renderSelectedFiles((data ?? []).map(row => row.csvName).filter(Boolean), { placeholder: 'No data loaded.' })
 
         if (data.length === 0) {
           setStatus('No data matched the current filters.')
@@ -2014,14 +2033,14 @@
       return
     }
 
+    selectedDataType = getSelectedDataTypeFromUrl() ?? selectedDataType
+
     registerMultiSelect(productLineSelect, { placeholder: 'All Product Lines' })
     registerMultiSelect(projectSelect, { placeholder: 'All Projects' })
     if (testReportSelect) {
       registerMultiSelect(testReportSelect, { placeholder: 'All Test Reports' })
     }
     registerMultiSelect(standardSelect, { placeholder: 'All Standards' })
-    registerMultiSelect(bandSelect, { placeholder: 'All Bands' })
-    registerMultiSelect(bandwidthSelect, { placeholder: 'All Bandwidths' })
     registerMultiSelect(deviceValueSelect, {
       placeholder: 'Select a device field first',
       showSelectAll: true
@@ -2040,6 +2059,11 @@
     testReportSelect?.addEventListener('change', handleCriteriaChange)
 
     if (dataTypeTabs) {
+      dataTypeTabs.querySelectorAll('[data-performance-datatype]').forEach(inner => {
+        const isActive = inner.dataset.performanceDatatype === selectedDataType
+        inner.classList.toggle('active', isActive)
+        inner.setAttribute('aria-selected', isActive ? 'true' : 'false')
+      })
       dataTypeTabs.querySelectorAll('[data-performance-datatype]').forEach(button => {
         button.addEventListener('click', () => {
           const value = button.dataset.performanceDatatype
