@@ -14,23 +14,22 @@ const clampLimit = raw => {
   return Math.min(DEFAULT_LIMIT, MAX_LIMIT)
 }
 
+const reportFromSql = `
+  FROM performance p
+  INNER JOIN test_run ex ON ex.id = p.execution_id
+  INNER JOIN test_case tc ON tc.id = ex.test_case_id
+  INNER JOIN project pr ON pr.id = tc.project_id
+  INNER JOIN dut d ON d.id = ex.dut_id
+`
+
 const reportSelectSql = `
   SELECT
-    tr.id AS report_id,
-    tr.execution_id,
-    tr.dut_id,
-    tr.csv_name,
-    tr.csv_path,
-    tr.data_type,
-    tr.case_path,
-    tr.created_at,
-    tr.updated_at,
-    ex.case_path AS execution_case_path,
-    d.connect_type AS dut_connect_type,
-    d.software_version AS dut_software_version,
-    d.main_chip AS dut_main_chip,
-    d.wifi_module AS dut_wifi_module,
-    d.interface AS dut_interface,
+    p.execution_id AS report_id,
+    p.data_type,
+    MAX(p.csv_name) AS csv_name,
+    MAX(tc.case_path) AS case_path,
+    MAX(tc.report_name) AS report_name,
+    MAX(p.created_at) AS last_updated_at,
     pr.id AS project_id,
     pr.brand,
     pr.product_line,
@@ -39,24 +38,44 @@ const reportSelectSql = `
     pr.wifi_module,
     pr.interface,
     pr.ecosystem,
-    pr.mass_production_status
-  FROM test_report tr
-  LEFT JOIN execution ex ON ex.id = tr.execution_id
-  LEFT JOIN dut d ON d.id = tr.dut_id
-  LEFT JOIN test_case tc ON tc.case_path = COALESCE(tr.case_path, ex.case_path)
-  LEFT JOIN project pr ON pr.id = tc.project_id
+    pr.mass_production_status,
+    d.id AS dut_id,
+    d.connect_type AS dut_connect_type,
+    d.software_version AS dut_software_version,
+    d.main_chip AS dut_main_chip,
+    d.wifi_module AS dut_wifi_module,
+    d.interface AS dut_interface
+  ${reportFromSql}
+`
+
+const reportGroupBySql = `
+  GROUP BY
+    p.execution_id,
+    p.data_type,
+    pr.id,
+    pr.brand,
+    pr.product_line,
+    pr.project_name,
+    pr.main_chip,
+    pr.wifi_module,
+    pr.interface,
+    pr.ecosystem,
+    pr.mass_production_status,
+    d.id,
+    d.connect_type,
+    d.software_version,
+    d.main_chip,
+    d.wifi_module,
+    d.interface
 `
 
 const mapReportRow = row => ({
   reportId: Number(row.report_id),
-  executionId: row.execution_id !== null ? Number(row.execution_id) : null,
-  dutId: row.dut_id !== null ? Number(row.dut_id) : null,
-  csvName: row.csv_name,
-  csvPath: row.csv_path,
-  dataType: row.data_type,
-  casePath: row.case_path ?? row.execution_case_path ?? null,
-  createdAt: toIso(row.created_at),
-  updatedAt: toIso(row.updated_at),
+  dataType: row.data_type ?? null,
+  csvName: row.csv_name ?? null,
+  reportName: row.report_name ?? null,
+  casePath: row.case_path ?? null,
+  lastUpdatedAt: toIso(row.last_updated_at),
   project: row.project_id
     ? {
         projectId: Number(row.project_id),
@@ -69,10 +88,10 @@ const mapReportRow = row => ({
         ecosystem: row.ecosystem ?? null,
         massProductionStatus: row.mass_production_status ?? null
       }
-    : null
-  ,
-  dut: row.dut_connect_type || row.dut_software_version || row.dut_main_chip || row.dut_wifi_module || row.dut_interface
+    : null,
+  dut: row.dut_id
     ? {
+        dutId: Number(row.dut_id),
         connectType: row.dut_connect_type ?? null,
         softwareVersion: row.dut_software_version ?? null,
         mainChip: row.dut_main_chip ?? null,
@@ -91,7 +110,8 @@ router.get('/recent', async (req, res, next) => {
       const [rows] = await connection.query(
         `
           ${reportSelectSql}
-          ORDER BY tr.created_at DESC, tr.id DESC
+          ${reportGroupBySql}
+          ORDER BY last_updated_at DESC, report_id DESC
           LIMIT ?
         `,
         [limit]
@@ -136,11 +156,11 @@ router.get('/', async (req, res, next) => {
 
       if (q) {
         if (numericId !== null) {
-          conditions.push('(tr.id = ? OR tr.csv_name LIKE ? OR tr.data_type LIKE ?)')
-          params.push(numericId, `%${q}%`, `%${q}%`)
+          conditions.push('(p.execution_id = ? OR p.csv_name LIKE ? OR p.data_type LIKE ? OR tc.report_name LIKE ?)')
+          params.push(numericId, `%${q}%`, `%${q}%`, `%${q}%`)
         } else {
-          conditions.push('(tr.csv_name LIKE ? OR tr.data_type LIKE ?)')
-          params.push(`%${q}%`, `%${q}%`)
+          conditions.push('(p.csv_name LIKE ? OR p.data_type LIKE ? OR tc.report_name LIKE ?)')
+          params.push(`%${q}%`, `%${q}%`, `%${q}%`)
         }
       }
 
@@ -153,7 +173,7 @@ router.get('/', async (req, res, next) => {
       }
 
       if (dataType) {
-        conditions.push('tr.data_type = ?')
+        conditions.push('p.data_type = ?')
         params.push(dataType)
       }
 
@@ -203,7 +223,8 @@ router.get('/', async (req, res, next) => {
         `
           ${reportSelectSql}
           ${whereSql}
-          ORDER BY tr.created_at DESC, tr.id DESC
+          ${reportGroupBySql}
+          ORDER BY last_updated_at DESC, report_id DESC
           LIMIT ?
         `,
         [...params, limit]
@@ -252,17 +273,18 @@ router.get('/batch/by-ids', async (req, res, next) => {
       const [rows] = await connection.query(
         `
           ${reportSelectSql}
-          WHERE tr.id IN (${placeholders})
+          WHERE p.execution_id IN (${placeholders})
+          ${reportGroupBySql}
         `,
         ids
       )
 
-      const rowById = new Map(rows.map(row => [Number(row.report_id), row]))
       res.json({
         rows: ids
-          .map(id => rowById.get(id))
-          .filter(Boolean)
-          .map(mapReportRow)
+          .flatMap(id => {
+            const matches = rows.filter(row => Number(row.report_id) === id)
+            return matches.map(mapReportRow)
+          })
       })
     } finally {
       connection.release()
@@ -278,10 +300,10 @@ router.get('/types', async (req, res, next) => {
     try {
       const [rows] = await connection.query(
         `
-          SELECT DISTINCT tr.data_type AS data_type
-          FROM test_report tr
-          WHERE tr.data_type IS NOT NULL AND tr.data_type <> ''
-          ORDER BY tr.data_type
+          SELECT DISTINCT p.data_type AS data_type
+          FROM performance p
+          WHERE p.data_type IS NOT NULL AND p.data_type <> ''
+          ORDER BY p.data_type
         `
       )
       res.json({ rows: rows.map(row => ({ dataType: row.data_type })) })
@@ -295,17 +317,27 @@ router.get('/types', async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
   const reportId = Number.parseInt(req.params.id, 10)
+  const dataType = typeof req.query.data_type === 'string' ? req.query.data_type.trim() : (typeof req.query.dataType === 'string' ? req.query.dataType.trim() : '')
 
   try {
     const connection = await pool.getConnection()
     try {
+      const params = [reportId]
+      let whereSql = 'WHERE p.execution_id = ?'
+      if (dataType) {
+        whereSql += ' AND p.data_type = ?'
+        params.push(dataType)
+      }
+
       const [rows] = await connection.query(
         `
           ${reportSelectSql}
-          WHERE tr.id = ?
+          ${whereSql}
+          ${reportGroupBySql}
+          ORDER BY last_updated_at DESC
           LIMIT 1
         `,
-        [reportId]
+        params
       )
 
       const row = rows?.[0]

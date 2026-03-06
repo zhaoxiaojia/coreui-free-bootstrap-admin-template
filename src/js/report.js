@@ -33,6 +33,13 @@
     return parsed
   }
 
+  const getDataTypeFromUrl = () => {
+    const params = new URLSearchParams(window.location.search)
+    const raw = params.get('data_type') ?? params.get('dataType') ?? ''
+    const trimmed = typeof raw === 'string' ? raw.trim() : ''
+    return trimmed || null
+  }
+
   const toMetaItem = (label, value) => {
     const escaped = value === null || value === undefined || value === '' ? 'N/A' : `${value}`
     return `
@@ -55,12 +62,16 @@
       metaListEl.innerHTML = [
         toMetaItem('Report ID', reportId),
         toMetaItem('Data Type', dataType),
-        toMetaItem('Execution ID', payload?.executionId ?? null),
-        toMetaItem('DUT ID', payload?.dutId ?? null),
+        toMetaItem('Report Name', payload?.reportName ?? null),
+        toMetaItem('Project', payload?.project?.projectName ?? null),
+        toMetaItem('Main Chip', payload?.project?.mainChip ?? payload?.dut?.mainChip ?? null),
+        toMetaItem('Wi-Fi Module', payload?.project?.wifiModule ?? payload?.dut?.wifiModule ?? null),
+        toMetaItem('Interface', payload?.project?.interface ?? payload?.dut?.interface ?? null),
+        toMetaItem('DUT ID', payload?.dut?.dutId ?? null),
+        toMetaItem('DUT Connect Type', payload?.dut?.connectType ?? null),
+        toMetaItem('DUT Software Version', payload?.dut?.softwareVersion ?? null),
         toMetaItem('Case Path', payload?.casePath ?? null),
-        toMetaItem('Created At', payload?.createdAt ?? null),
-        toMetaItem('Updated At', payload?.updatedAt ?? null),
-        toMetaItem('CSV Path', payload?.csvPath ?? null)
+        toMetaItem('Last Updated At', payload?.lastUpdatedAt ?? null)
       ].join('')
     }
 
@@ -81,8 +92,10 @@
       const stored = localStorage.getItem(historyKey)
       const parsed = stored ? JSON.parse(stored) : {}
       const now = Date.now()
-      const entry = parsed[reportId] ?? {}
-      parsed[reportId] = {
+      const dataType = getDataTypeFromUrl() ?? 'unknown'
+      const key = `${reportId}|${dataType}`
+      const entry = parsed[key] ?? {}
+      parsed[key] = {
         count: Number(entry.count ?? 0) + 1,
         lastVisitedAt: now
       }
@@ -93,7 +106,10 @@
 
     setStatus(`Loading report #${reportId}...`, 'info')
 
-    fetchJson(`${API_BASE}/reports/${reportId}`)
+    const dataType = getDataTypeFromUrl()
+    const url = dataType ? `${API_BASE}/reports/${reportId}?data_type=${encodeURIComponent(dataType)}` : `${API_BASE}/reports/${reportId}`
+
+    fetchJson(url)
       .then(payload => {
         renderReport(payload)
         setStatus('Report loaded. Detailed rendering is not implemented yet.', 'secondary')

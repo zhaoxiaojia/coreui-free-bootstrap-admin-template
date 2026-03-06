@@ -39,13 +39,13 @@
     const reportId = row?.reportId ?? null
     const csvName = row?.csvName ?? 'Report'
     const dataType = row?.dataType ?? 'Unknown'
-    const createdAt = row?.createdAt ?? ''
+    const createdAt = row?.lastUpdatedAt ?? ''
     const projectText = formatProjectLabel(row?.project)
     const metaParts = [projectText, dataType, createdAt].filter(Boolean)
     const meta = metaParts.join(' · ')
 
     return `
-      <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center gap-3" href="report.html?report_id=${reportId}">
+      <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center gap-3" href="report.html?report_id=${reportId}&data_type=${encodeURIComponent(dataType)}">
         <div class="min-w-0">
           <div class="fw-semibold text-truncate">${csvName}</div>
           <div class="small text-muted text-truncate">${meta}</div>
@@ -59,7 +59,7 @@
     const reportId = row?.reportId ?? null
     const csvName = row?.csvName ?? 'Report'
     const dataType = row?.dataType ?? 'Unknown'
-    const createdAt = row?.createdAt ?? ''
+    const createdAt = row?.lastUpdatedAt ?? ''
     const projectName = row?.project?.projectName ?? 'Unknown project'
     const wifiModule = row?.project?.wifiModule ?? ''
     const productLine = row?.project?.productLine ?? ''
@@ -67,7 +67,7 @@
 
     return `
       <div class="col-12 col-md-6 col-xl-4">
-        <a class="card h-100 text-decoration-none" href="report.html?report_id=${reportId}">
+        <a class="card h-100 text-decoration-none" href="report.html?report_id=${reportId}&data_type=${encodeURIComponent(dataType)}">
           <div class="card-body">
             <div class="d-flex align-items-start justify-content-between gap-2">
               <div class="min-w-0">
@@ -176,24 +176,37 @@
     const historyKey = 'wifi-dashboard-report-history'
     const stored = localStorage.getItem(historyKey)
     const parsed = stored ? JSON.parse(stored) : {}
-    const ids = Object.entries(parsed)
-      .map(([id, entry]) => ({
-        id: Number.parseInt(id, 10),
+    const items = Object.entries(parsed)
+      .map(([key, entry]) => {
+        const [rawId, rawType] = `${key}`.split('|')
+        return {
+          key: `${key}`,
+          id: Number.parseInt(`${rawId ?? ''}`, 10),
+          dataType: `${rawType ?? ''}`.trim(),
         count: Number(entry?.count ?? 0),
         lastVisitedAt: Number(entry?.lastVisitedAt ?? 0)
-      }))
-      .filter(item => Number.isFinite(item.id) && item.id > 0 && item.count > 0)
+        }
+      })
+      .filter(item => Number.isFinite(item.id) && item.id > 0 && item.count > 0 && item.dataType.length > 0)
       .sort((a, b) => b.count - a.count || b.lastVisitedAt - a.lastVisitedAt)
       .slice(0, 9)
-      .map(item => item.id)
+      .map(item => item)
 
-    if (ids.length === 0) {
+    if (items.length === 0) {
       frequentGrid.innerHTML = `<div class="text-muted small">No frequently viewed reports yet.</div>`
       return
     }
 
+    const ids = [...new Set(items.map(item => item.id))]
     fetchJson(`${API_BASE}/reports/batch/by-ids?ids=${ids.join(',')}`)
-      .then(payload => renderGrid(frequentGrid, payload?.rows ?? []))
+      .then(payload => {
+        const rows = Array.isArray(payload?.rows) ? payload.rows : []
+        const rowByKey = new Map(rows.map(row => [`${row.reportId}|${row.dataType}`, row]))
+        const ordered = items
+          .map(item => rowByKey.get(`${item.id}|${item.dataType}`))
+          .filter(Boolean)
+        renderGrid(frequentGrid, ordered)
+      })
       .catch(() => {
         frequentGrid.innerHTML = `<div class="text-muted small">Failed to load frequently viewed reports.</div>`
       })
@@ -204,7 +217,9 @@
     if (!trimmed) return
     const numeric = /^\d+$/.test(trimmed) ? trimmed : null
     if (numeric) {
-      window.location.href = `report.html?report_id=${numeric}`
+      const { dataType } = getSearchParams()
+      const suffix = dataType ? `&data_type=${encodeURIComponent(dataType)}` : ''
+      window.location.href = `report.html?report_id=${numeric}${suffix}`
       return
     }
     search(trimmed)
