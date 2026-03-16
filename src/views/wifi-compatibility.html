@@ -42,7 +42,6 @@
     <!-- We use those styles to show code examples, you should remove them in your application.-->
     <link href="css/examples.css" rel="stylesheet">
     <script src="js/config.js"></script>
-    <script src="js/color-modes.js"></script>
     <link rel="stylesheet" href="node_modules/@coreui/chartjs/dist/css/coreui-chartjs.css">
     <link rel="stylesheet" href="css/dashboard.css">
   </head>
@@ -60,18 +59,20 @@
             <svg class="nav-icon">
               <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-home"></use>
             </svg> Home</a></li>
-        <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+        <li class="nav-group show"><a class="nav-link" href="wifi-dashboard.html">
             <svg class="nav-icon">
               <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-wifi-signal-4"></use>
-          </svg> Wi-Fi Dashboard</a>
+          </svg> Wi-Fi Database</a>
           <ul class="nav-group-items compact">
             <li class="nav-item"><a class="nav-link" href="wifi-dashboard.html?datatype=PEAK_THROUGHPUT"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Peak Throughput</a></li>
             <li class="nav-item"><a class="nav-link" href="wifi-dashboard.html?datatype=RVR"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> RVR</a></li>
             <li class="nav-item"><a class="nav-link" href="wifi-dashboard.html?datatype=RVO"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> RVO</a></li>
+            <li class="nav-item"><a class="nav-link" href="wifi-ota.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> OTA</a></li>
             <li class="nav-item"><a class="nav-link" href="wifi-function.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Function</a></li>
             <li class="nav-item"><a class="nav-link" href="wifi-compatibility.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Compatibility</a></li>
             <li class="nav-item"><a class="nav-link" href="wifi-home.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Home Environment</a></li>
             <li class="nav-item"><a class="nav-link" href="wifi-interference.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Interference</a></li>
+            <li class="nav-item"><a class="nav-link" href="projects-progress.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Project Progress</a></li>
           </ul>
         </li>
         <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
@@ -372,32 +373,6 @@
                       <label class="form-label" for="filterStandard">Standard</label>
                       <select class="form-select" id="filterStandard">
                         <option value="">All Standards</option>
-                      </select>
-                    </div>
-                    <div class="col-12">
-                      <label class="form-label" for="filterBand">Band</label>
-                      <select class="form-select" id="filterBand">
-                        <option value="">All Bands</option>
-                      </select>
-                    </div>
-                    <div class="col-12">
-                      <label class="form-label" for="filterBandwidth">Bandwidth</label>
-                      <select class="form-select" id="filterBandwidth">
-                        <option value="">All Bandwidths</option>
-                      </select>
-                    </div>
-                    <div class="col-12">
-                      <label class="form-label" for="filterDeviceType">Device Field</label>
-                      <select class="form-select" id="filterDeviceType">
-                        <option value="">All Device Fields</option>
-                        <option value="adb_device">ADB Device</option>
-                        <option value="telnet_ip">Telnet IP</option>
-                      </select>
-                    </div>
-                    <div class="col-12">
-                      <label class="form-label" for="filterDeviceValue">Device Value</label>
-                      <select class="form-select" id="filterDeviceValue" disabled>
-                        <option value="">Select a device field</option>
                       </select>
                     </div>
                     <div class="col-12">

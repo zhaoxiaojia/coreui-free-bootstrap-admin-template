@@ -84,6 +84,30 @@ const uniqueValues = values => {
   return [...new Set(values)]
 }
 
+const expandDataTypes = values => {
+  const expanded = []
+  for (const value of values ?? []) {
+    if (!value) continue
+    expanded.push(value)
+
+    const lower = `${value}`.toLowerCase()
+    const upper = `${value}`.toUpperCase()
+    expanded.push(lower)
+    expanded.push(upper)
+
+    if (upper === 'PEAK_THROUGHPUT') {
+      expanded.push('performance')
+      expanded.push('THROUGHPUT')
+      expanded.push('throughput')
+      expanded.push('Peak Throughput')
+      expanded.push('tx')
+      expanded.push('rx')
+      expanded.push('bi')
+    }
+  }
+  return uniqueValues(expanded)
+}
+
 const addConditionForValues = (conditions, params, column, values) => {
   const unique = uniqueValues(values ?? [])
   if (unique.length === 0) {
@@ -112,7 +136,7 @@ export const normalizeFilters = query => {
   const standards = uniqueValues(parseStringList(query.standard))
   const bands = uniqueValues(parseStringList(query.band))
   const bandwidthsMhz = uniqueValues(parseNumberList(query.bandwidth_mhz ?? query.bandwidthMhz))
-  const dataTypes = uniqueValues(parseStringList(query.data_type ?? query.dataType))
+  const dataTypes = expandDataTypes(parseStringList(query.data_type ?? query.dataType))
   const testReportCsvNames = uniqueValues(
     parseStringList(
       query.test_report_csv_name ??
@@ -181,14 +205,6 @@ export const buildDutConditions = (filters, { exclude = [] } = {}) => {
   const conditions = []
   const params = []
 
-  if (!exclude.includes('productLine')) {
-    addConditionForValues(conditions, params, 'product_line', filters.productLines)
-  }
-
-  if (!exclude.includes('project')) {
-    addConditionForValues(conditions, params, 'project', filters.projects)
-  }
-
   if (!exclude.includes('device') && filters.deviceColumn) {
     addConditionForValues(conditions, params, filters.deviceColumn, filters.deviceValues)
   }
@@ -196,13 +212,38 @@ export const buildDutConditions = (filters, { exclude = [] } = {}) => {
   return { conditions, params }
 }
 
+const getCanonicalDataType = filters => {
+  const raw = typeof filters?.dataType === 'string' ? filters.dataType.trim().toUpperCase() : ''
+  if (!raw) {
+    return null
+  }
+
+  if (raw === 'THROUGHPUT' || raw === 'PERFORMANCE' || raw === 'PEAK THROUGHPUT') {
+    return 'PEAK_THROUGHPUT'
+  }
+
+  return raw
+}
+
 export const buildPerformanceConditions = (filters, { exclude = [], includeBase = true } = {}) => {
   const conditions = []
   const params = []
 
   if (includeBase) {
-    conditions.push('p.path_loss_db IS NOT NULL')
-    conditions.push('p.throughput_avg_mbps IS NOT NULL')
+    const canonicalDataType = getCanonicalDataType(filters)
+
+    // Base field requirements must follow the selected data type instead of
+    // forcing one global rule across Peak/RVR/RVO.
+    if (canonicalDataType === 'RVO') {
+      conditions.push('p.path_loss_db IS NOT NULL')
+      conditions.push('COALESCE(p.throughput_avg_mbps, p.throughput_peak_mbps, kv.throughput_mbps) IS NOT NULL')
+      conditions.push('p.angle_deg IS NOT NULL')
+    } else if (canonicalDataType === 'RVR') {
+      conditions.push('p.path_loss_db IS NOT NULL')
+      conditions.push('COALESCE(p.throughput_avg_mbps, p.throughput_peak_mbps, kv.throughput_mbps) IS NOT NULL')
+    } else {
+      conditions.push('COALESCE(p.throughput_avg_mbps, p.throughput_peak_mbps, kv.throughput_mbps) IS NOT NULL')
+    }
   }
 
   if (!exclude.includes('productLine')) {
@@ -272,7 +313,7 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
 
   if (!exclude.includes('testReport')) {
     addConditionForValues(conditions, params, 'ex.csv_name', filters.testReportCsvNames)
-    addConditionForValues(conditions, params, 'tc.report_name', filters.reportNames)
+    addConditionForValues(conditions, params, 'tr.report_name', filters.reportNames)
   }
 
   if (!exclude.includes('startDate') && filters.startDate) {
@@ -342,9 +383,15 @@ export const buildTestReportConditions = (filters, { exclude = [] } = {}) => {
     }
   }
 
+  if (!exclude.includes('dataType')) {
+    if (addConditionForValues(conditions, params, 'p.data_type', filters.dataTypes)) {
+      requiresPerformanceJoin = true
+    }
+  }
+
   if (!exclude.includes('testReport')) {
     addConditionForValues(conditions, params, 'ex.csv_name', filters.testReportCsvNames)
-    addConditionForValues(conditions, params, 'tc.report_name', filters.reportNames)
+    addConditionForValues(conditions, params, 'tr.report_name', filters.reportNames)
   }
 
   if (!exclude.includes('startDate') && filters.startDate) {

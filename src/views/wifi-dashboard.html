@@ -42,12 +42,11 @@
     <!-- We use those styles to show code examples, you should remove them in your application.-->
     <link href="css/examples.css" rel="stylesheet">
     <script src="js/config.js"></script>
-    <script src="js/color-modes.js"></script>
     <link rel="stylesheet" href="node_modules/@coreui/chartjs/dist/css/coreui-chartjs.css">
     <link rel="stylesheet" href="css/dashboard.css">
   </head>
   <body class="dashboard-page">
-    <div class="sidebar sidebar-dark sidebar-fixed border-end" id="sidebar">
+    <div class="sidebar sidebar-fixed border-end" id="sidebar">
       <div class="sidebar-header border-bottom">
         <div class="sidebar-brand">
           <img class="sidebar-brand-full" src="assets/brand/amlogic.jpg" alt="Amlogic Logo">
@@ -59,19 +58,21 @@
         <li class="nav-item"><a class="nav-link" href="index.html">
             <svg class="nav-icon">
               <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-home"></use>
-            </svg> Home</a></li>
-        <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
+            </svg> Data Center</a></li>
+        <li class="nav-group show"><a class="nav-link" href="wifi-dashboard.html">
             <svg class="nav-icon">
               <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-wifi-signal-4"></use>
-          </svg> Wi-Fi Dashboard</a>
+          </svg> Wi-Fi Database</a>
           <ul class="nav-group-items compact">
             <li class="nav-item"><a class="nav-link" href="wifi-dashboard.html?datatype=PEAK_THROUGHPUT"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Peak Throughput</a></li>
             <li class="nav-item"><a class="nav-link" href="wifi-dashboard.html?datatype=RVR"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> RVR</a></li>
             <li class="nav-item"><a class="nav-link" href="wifi-dashboard.html?datatype=RVO"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> RVO</a></li>
+            <li class="nav-item"><a class="nav-link" href="wifi-ota.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> OTA</a></li>
             <li class="nav-item"><a class="nav-link" href="wifi-function.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Function</a></li>
             <li class="nav-item"><a class="nav-link" href="wifi-compatibility.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Compatibility</a></li>
             <li class="nav-item"><a class="nav-link" href="wifi-home.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Home Environment</a></li>
             <li class="nav-item"><a class="nav-link" href="wifi-interference.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Interference</a></li>
+            <li class="nav-item"><a class="nav-link" href="projects-progress.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Project Progress</a></li>
           </ul>
         </li>
         <li class="nav-group"><a class="nav-link nav-group-toggle" href="#">
@@ -227,34 +228,12 @@
               <div class="vr h-100 mx-2 text-body text-opacity-75"></div>
             </li>
             <li class="nav-item dropdown">
-              <button class="btn btn-link nav-link py-2 px-2 d-flex align-items-center" type="button" aria-expanded="false" data-coreui-toggle="dropdown">
-                <svg class="icon icon-lg theme-icon-active">
+              <a class="nav-link py-2 px-2 d-flex align-items-center dashboard-theme-toggle" href="#" role="button" data-coreui-toggle="dropdown" aria-expanded="false" id="dashboardThemeDropdownToggle" aria-label="Theme menu" title="Theme menu">
+                <svg class="icon icon-lg">
                   <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-contrast"></use>
                 </svg>
-              </button>
-              <ul class="dropdown-menu dropdown-menu-end" style="--cui-dropdown-min-width: 8rem;">
-                <li>
-                  <button class="dropdown-item d-flex align-items-center" type="button" data-coreui-theme-value="light">
-                    <svg class="icon icon-lg me-3">
-                      <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-sun"></use>
-                    </svg>Light
-                  </button>
-                </li>
-                <li>
-                  <button class="dropdown-item d-flex align-items-center" type="button" data-coreui-theme-value="dark">
-                    <svg class="icon icon-lg me-3">
-                      <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-moon"></use>
-                    </svg>Dark
-                  </button>
-                </li>
-                <li>
-                  <button class="dropdown-item d-flex align-items-center active" type="button" data-coreui-theme-value="auto">
-                    <svg class="icon icon-lg me-3">
-                      <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-contrast"></use>
-                    </svg>Auto
-                  </button>
-                </li>
-              </ul>
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end" data-theme-menu aria-labelledby="dashboardThemeDropdownToggle"></ul>
             </li>
             <li class="nav-item py-1">
               <div class="vr h-100 mx-2 text-body text-opacity-75"></div>
@@ -300,16 +279,6 @@
               </div>
             </li>
           </ul>
-        </div>
-        <div class="container-fluid px-4">
-          <nav aria-label="breadcrumb">
-            <ol class="breadcrumb my-0">
-              <li class="breadcrumb-item"><a href="#">Home</a>
-              </li>
-              <li class="breadcrumb-item active"><span>Dashboard</span>
-              </li>
-            </ol>
-          </nav>
         </div>
       </header>
       <div class="body flex-grow-1">
@@ -375,20 +344,6 @@
                       </select>
                     </div>
                     <div class="col-12">
-                      <label class="form-label" for="filterDeviceType">Device Field</label>
-                      <select class="form-select" id="filterDeviceType">
-                        <option value="">All Device Fields</option>
-                        <option value="adb_device">ADB Device</option>
-                        <option value="telnet_ip">Telnet IP</option>
-                      </select>
-                    </div>
-                    <div class="col-12">
-                      <label class="form-label" for="filterDeviceValue">Device Value</label>
-                      <select class="form-select" id="filterDeviceValue" disabled>
-                        <option value="">Select a device field</option>
-                      </select>
-                    </div>
-                    <div class="col-12">
                       <label class="form-label" for="filterStartDate">Start Date</label>
                       <input class="form-control" id="filterStartDate" type="date">
                     </div>
@@ -406,7 +361,7 @@
                     <div class="small text-muted">Filtered Files</div>
                     <div class="small text-muted"><span id="selectedFilesCount">0</span></div>
                   </div>
-                  <div class="mt-2 border rounded-3 bg-body-tertiary" style="max-height: 12rem; overflow: auto;">
+                  <div class="mt-2 border rounded-3 selected-files-shell" style="max-height: 12rem; overflow: auto;">
                     <ul class="list-group list-group-flush small" id="selectedFilesList">
                       <li class="list-group-item bg-transparent text-muted">No files loaded yet.</li>
                     </ul>

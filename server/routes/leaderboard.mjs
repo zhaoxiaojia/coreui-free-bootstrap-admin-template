@@ -3,8 +3,10 @@ import pool from '../db.mjs'
 import { buildPerformanceConditions, normalizeFilters } from '../utils/filter-utils.mjs'
 import { buildScenarioProjectLeaderboardQuery } from '../services/leaderboard-queries.mjs'
 import { getLeaderboardScenario } from '../services/leaderboard-scenarios.mjs'
+import { createLogger } from '../utils/logger.mjs'
 
 const router = Router()
+const logger = createLogger({ name: 'api.leaderboard' })
 
 const DEFAULT_LIMIT = Number.parseInt(process.env.API_LEADERBOARD_DEFAULT_LIMIT ?? '20', 10)
 const MAX_LIMIT = Number.parseInt(process.env.API_LEADERBOARD_MAX_LIMIT ?? '100', 10)
@@ -40,6 +42,14 @@ router.get('/', async (req, res, next) => {
           limit: appliedLimit
         })
         const [rows] = await connection.query(sql, params)
+        if (!rows || rows.length === 0) {
+          logger.warn('leaderboard_empty', {
+            scenario: scenarioKey,
+            metric: resolvedMetric,
+            limit: appliedLimit,
+            filters
+          })
+        }
 
         res.json({
           scenario: scenario.key,
@@ -71,6 +81,14 @@ router.get('/', async (req, res, next) => {
           limit: appliedLimit
         })
         const [rows] = await connection.query(sql, params)
+        if (!rows || rows.length === 0) {
+          logger.warn('leaderboard_empty', {
+            scenario: 'performance',
+            metric: resolvedMetric,
+            limit: appliedLimit,
+            filters
+          })
+        }
 
         res.json({
           scenario: 'performance',
@@ -116,9 +134,9 @@ router.get('/', async (req, res, next) => {
           COUNT(*) AS sample_count,
           MAX(p.created_at) AS last_updated_at
         FROM performance p
-        INNER JOIN test_run ex ON ex.id = p.execution_id
-        INNER JOIN test_case tc ON tc.id = ex.test_case_id
-        INNER JOIN project pr ON pr.id = tc.project_id
+        INNER JOIN execution ex ON ex.id = p.execution_id
+        INNER JOIN test_report tr ON tr.id = ex.test_report_id
+        INNER JOIN project pr ON pr.id = tr.project_id
         INNER JOIN dut d ON d.id = ex.dut_id
       `
       if (conditions.length > 0) {
@@ -144,6 +162,14 @@ router.get('/', async (req, res, next) => {
       params.push(appliedLimit)
 
       const [rows] = await connection.query(query, params)
+      if (!rows || rows.length === 0) {
+        logger.warn('leaderboard_empty', {
+          scenario: 'raw',
+          metric: metricColumn,
+          limit: appliedLimit,
+          filters
+        })
+      }
 
       res.json({
         metric: metricColumn,

@@ -45,7 +45,9 @@ router.get('/', async (req, res, next) => {
       let query = `
         SELECT
           p.path_loss_db,
+          COALESCE(p.throughput_avg_mbps, p.throughput_peak_mbps, kv.throughput_mbps) AS throughput_value_mbps,
           p.throughput_avg_mbps,
+          p.throughput_peak_mbps,
           p.created_at,
           p.execution_id,
           p.scenario_group_key,
@@ -59,19 +61,26 @@ router.get('/', async (req, res, next) => {
           p.protocol,
           p.csv_name,
           p.data_type,
-          tc.report_name,
-          tc.case_path,
-          tc.project_id,
+          tr.id AS test_report_id,
+          tr.report_name,
+          tr.case_path,
+          tr.project_id,
           pr.brand,
           pr.product_line,
           pr.project_name,
           d.adb_device,
           d.telnet_ip
         FROM performance p
-        INNER JOIN test_run ex ON ex.id = p.execution_id
-        INNER JOIN test_case tc ON tc.id = ex.test_case_id
-        INNER JOIN project pr ON pr.id = tc.project_id
+        INNER JOIN execution ex ON ex.id = p.execution_id
+        INNER JOIN test_report tr ON tr.id = ex.test_report_id
+        INNER JOIN project pr ON pr.id = tr.project_id
         INNER JOIN dut d ON d.id = ex.dut_id
+        LEFT JOIN (
+          SELECT execution_id, AVG(metric_value) AS throughput_mbps
+          FROM perf_metric_kv
+          WHERE metric_name = 'throughput'
+          GROUP BY execution_id
+        ) kv ON kv.execution_id = p.execution_id
       `
       if (performanceFilter.conditions.length > 0) {
         query += ` WHERE ${performanceFilter.conditions.join(' AND ')}`
@@ -100,9 +109,15 @@ router.get('/', async (req, res, next) => {
 
       const data = effectiveRows.map(row => ({
         pathLossDb: row.path_loss_db !== null ? Number(row.path_loss_db) : null,
-        throughputAvgMbps: row.throughput_avg_mbps !== null ? Number(row.throughput_avg_mbps) : null,
+        throughputAvgMbps: row.throughput_value_mbps !== null ? Number(row.throughput_value_mbps) : null,
+        throughputSource: row.throughput_avg_mbps !== null
+          ? 'throughput_avg_mbps'
+          : row.throughput_peak_mbps !== null
+            ? 'throughput_peak_mbps'
+            : 'perf_metric_kv',
         createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
         executionId: row.execution_id ?? null,
+        testReportId: row.test_report_id ?? null,
         scenarioGroupKey: row.scenario_group_key ?? null,
         band: row.band ?? null,
         bandwidthMhz: row.bandwidth_mhz !== null ? Number(row.bandwidth_mhz) : null,

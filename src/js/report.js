@@ -50,12 +50,46 @@
     `.trim()
   }
 
+  const pad2 = value => String(value).padStart(2, '0')
+
+  const formatDateParts = raw => {
+    if (!raw) return null
+    const date = new Date(raw)
+    if (!Number.isFinite(date.getTime())) return null
+    const yyyy = String(date.getFullYear())
+    const mm = pad2(date.getMonth() + 1)
+    const dd = pad2(date.getDate())
+    const HH = pad2(date.getHours())
+    const MM = pad2(date.getMinutes())
+    const SS = pad2(date.getSeconds())
+    return { date: `${yyyy}${mm}${dd}`, time: `${HH}${MM}${SS}` }
+  }
+
+  const extractDateTimeFromName = value => {
+    const text = `${value ?? ''}`
+    const match = text.match(/(\d{8})_(\d{6})/)
+    if (!match) return null
+    return { date: match[1], time: match[2] }
+  }
+
+  const buildReportDisplayName = payload => {
+    const testType = `${payload?.dataType ?? ''}`.trim()
+    const projectName = `${payload?.project?.projectName ?? ''}`.trim()
+    const parts = extractDateTimeFromName(payload?.reportName ?? payload?.csvName ?? null)
+      ?? formatDateParts(payload?.lastUpdatedAt ?? payload?.createdAt ?? null)
+    const dateText = parts?.date ?? ''
+    const timeText = parts?.time ?? ''
+    const segments = [testType, projectName, dateText, timeText].filter(Boolean)
+    return segments.join('_')
+  }
+
   const renderReport = payload => {
     const reportId = payload?.reportId ?? null
     const dataType = payload?.dataType ?? null
     const csvName = payload?.csvName ?? null
 
-    if (titleEl) titleEl.textContent = csvName ? `${csvName}` : `Report #${reportId ?? ''}`
+    const displayName = buildReportDisplayName(payload)
+    if (titleEl) titleEl.textContent = displayName || (csvName ? `${csvName}` : `Report #${reportId ?? ''}`)
     if (subtitleEl) subtitleEl.textContent = dataType ? `${dataType}` : 'Unknown report type'
 
     if (metaListEl) {

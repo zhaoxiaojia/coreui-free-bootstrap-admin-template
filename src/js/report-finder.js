@@ -1,6 +1,19 @@
 (() => {
   const DEFAULT_API_BASE = new URL('/api', window.location.origin).toString()
-  const API_BASE = window.WIFI_DASHBOARD_API_BASE ?? DEFAULT_API_BASE
+  const inferLocalApiBase = () => {
+    const hostname = window.location.hostname
+    const port = window.location.port
+
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') return ''
+    if (!port) return ''
+
+    const portsWithApi = new Set(['3000', '5000'])
+    if (portsWithApi.has(port)) return ''
+
+    return `${window.location.protocol}//${hostname}:5000/api`
+  }
+
+  const API_BASE = window.WIFI_DASHBOARD_API_BASE ?? inferLocalApiBase() ?? DEFAULT_API_BASE
 
   const form = document.getElementById('reportFinderForm')
   const input = document.getElementById('reportFinderQuery')
@@ -8,16 +21,53 @@
   const recentGrid = document.getElementById('reportFinderRecentGrid')
   const frequentGrid = document.getElementById('reportFinderFrequentGrid')
   const projectSelect = document.getElementById('reportFinderProject')
+  const projectDropdownToggle = document.getElementById('reportFinderProjectToggle')
+  const projectDropdownMenu = document.getElementById('reportFinderProjectMenu')
   const reportTypeSelect = document.getElementById('reportFinderReportType')
   const brandSelect = document.getElementById('reportFinderBrand')
   const productLineSelect = document.getElementById('reportFinderProductLine')
   const mainChipSelect = document.getElementById('reportFinderMainChip')
-  const wifiModuleSelect = document.getElementById('reportFinderWifiModule')
-  const interfaceSelect = document.getElementById('reportFinderInterface')
   const selectedFiltersEl = document.getElementById('reportFinderSelectedFilters')
   const resetButton = document.getElementById('reportFinderReset')
 
   let activeRequest = 0
+
+  const escapeHtml = value => {
+    const text = `${value ?? ''}`
+    return text
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;')
+  }
+
+  const clampLabel = (value, maxLen) => {
+    const text = `${value ?? ''}`.trim()
+    if (!text) return ''
+    if (text.length <= maxLen) return text
+    return `${text.slice(0, Math.max(0, maxLen - 1))}…`
+  }
+
+  const hashToHue = value => {
+    const text = `${value ?? ''}`
+    let hash = 0
+    for (let i = 0; i < text.length; i += 1) {
+      hash = (hash * 31 + text.charCodeAt(i)) >>> 0
+    }
+    return hash % 360
+  }
+
+  const pickIconLabel = ({ csvName, dataType }) => {
+    const type = `${dataType ?? ''}`.trim()
+    if (type) return clampLabel(type.toUpperCase(), 4)
+
+    const name = `${csvName ?? ''}`.trim()
+    const ext = name.includes('.') ? name.split('.').pop() : ''
+    if (ext) return clampLabel(ext.toUpperCase(), 4)
+
+    return 'RPT'
+  }
 
   const fetchJson = async url => {
     const response = await fetch(url)
@@ -33,6 +83,41 @@
     const brand = project?.brand ?? ''
     const parts = [name, productLine, brand].filter(Boolean)
     return parts.join(' · ')
+  }
+
+  const pad2 = value => String(value).padStart(2, '0')
+
+  const formatDateParts = raw => {
+    if (!raw) return null
+    const date = new Date(raw)
+    if (!Number.isFinite(date.getTime())) return null
+    const yyyy = String(date.getFullYear())
+    const mm = pad2(date.getMonth() + 1)
+    const dd = pad2(date.getDate())
+    const HH = pad2(date.getHours())
+    const MM = pad2(date.getMinutes())
+    const SS = pad2(date.getSeconds())
+    return { date: `${yyyy}${mm}${dd}`, time: `${HH}${MM}${SS}` }
+  }
+
+  const extractDateTimeFromName = value => {
+    const text = `${value ?? ''}`
+    const match = text.match(/(\d{8})_(\d{6})/)
+    if (!match) return null
+    return { date: match[1], time: match[2] }
+  }
+
+  const buildReportDisplayName = row => {
+    const testType = `${row?.dataType ?? ''}`.trim()
+    const projectName = `${row?.project?.projectName ?? ''}`.trim()
+    const parts = extractDateTimeFromName(row?.reportName ?? row?.csvName ?? null)
+      ?? formatDateParts(row?.lastUpdatedAt ?? row?.createdAt ?? null)
+    const dateText = parts?.date ?? ''
+    const timeText = parts?.time ?? ''
+
+    const segments = [testType, projectName, dateText, timeText].filter(Boolean)
+    if (segments.length > 0) return segments.join('_')
+    return `${row?.reportName ?? row?.csvName ?? 'Report'}`
   }
 
   const buildResultItem = row => {
@@ -57,37 +142,59 @@
 
   const buildCard = row => {
     const reportId = row?.reportId ?? null
-    const csvName = row?.csvName ?? 'Report'
     const dataType = row?.dataType ?? 'Unknown'
+    const scoreText = window.WIFI_DASHBOARD_SCORING?.formatScoreByMetric
+      ? window.WIFI_DASHBOARD_SCORING.formatScoreByMetric('composite_score', row?.score)
+      : (Number.isFinite(Number(row?.score)) ? String(Number(row.score)) : '-')
     const createdAt = row?.lastUpdatedAt ?? ''
-    const projectName = row?.project?.projectName ?? 'Unknown project'
-    const wifiModule = row?.project?.wifiModule ?? ''
-    const productLine = row?.project?.productLine ?? ''
-    const chipLine = [wifiModule, productLine].filter(Boolean).join(' · ')
+    const projectName = row?.project?.projectName ?? ''
+    const displayName = buildReportDisplayName(row)
+    const cardHue = hashToHue(`${reportId}|${dataType}|${projectName}`)
+    const href = `report.html?report_id=${reportId}&data_type=${encodeURIComponent(dataType)}`
+    const typeLabel = `${dataType ?? ''}`.trim() || 'Type'
 
     return `
       <div class="col-12 col-md-6 col-xl-4">
-        <a class="card h-100 text-decoration-none" href="report.html?report_id=${reportId}&data_type=${encodeURIComponent(dataType)}">
-          <div class="card-body">
-            <div class="d-flex align-items-start justify-content-between gap-2">
-              <div class="min-w-0">
-                <div class="fw-semibold text-truncate">${csvName}</div>
-                <div class="small text-muted text-truncate">${projectName}</div>
+        <div class="card report-card h-100" style="--card-hue: ${cardHue};">
+          <div class="card-body d-flex flex-column report-card__body">
+            <a class="stretched-link" href="${href}" aria-label="Open report"></a>
+
+            <div class="d-flex align-items-start justify-content-between gap-3">
+              <div class="report-card__typeText">${escapeHtml(typeLabel)}</div>
+            </div>
+
+            <div class="report-card__scoreCenter">${escapeHtml(scoreText)}</div>
+
+            <div class="mt-auto d-flex align-items-end justify-content-between gap-2 report-card__bottom">
+              <div class="report-card__meta small text-muted">
+                ${projectName ? `<div class="text-truncate">${escapeHtml(projectName)}</div>` : ''}
+                ${createdAt ? `<div class="text-truncate">${escapeHtml(createdAt)}</div>` : ''}
               </div>
-              <span class="badge text-bg-light border">#${reportId}</span>
-            </div>
-            <div class="mt-3 d-flex flex-wrap gap-2">
-              <span class="badge text-bg-success">${dataType}</span>
-              ${chipLine ? `<span class="badge text-bg-secondary">${chipLine}</span>` : ''}
             </div>
           </div>
-          <div class="card-footer small text-muted d-flex justify-content-between">
-            <span>${createdAt || ''}</span>
-            <span class="text-decoration-none">Open</span>
-          </div>
-        </a>
+        </div>
       </div>
     `.trim()
+  }
+
+  const dedupeRecentRows = (rows, maxRows) => {
+    const seen = new Set()
+    const out = []
+
+    for (const row of rows ?? []) {
+      const key = [
+        row?.reportName ?? row?.csvName ?? '',
+        row?.dataType ?? '',
+        row?.project?.projectId ?? '',
+        row?.lastUpdatedAt ?? row?.createdAt ?? ''
+      ].join('|')
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(row)
+      if (Number.isFinite(maxRows) && out.length >= maxRows) break
+    }
+
+    return out
   }
 
   const setResultsVisible = isVisible => {
@@ -125,14 +232,17 @@
   }
 
   const getSearchParams = () => {
-    const projectId = projectSelect?.value ? `${projectSelect.value}` : ''
+    const project = projectSelect?.value ? `${projectSelect.value}` : ''
     const dataType = reportTypeSelect?.value ? `${reportTypeSelect.value}` : ''
     const brand = brandSelect?.value ? `${brandSelect.value}` : ''
     const productLine = productLineSelect?.value ? `${productLineSelect.value}` : ''
     const mainChip = mainChipSelect?.value ? `${mainChipSelect.value}` : ''
-    const wifiModule = wifiModuleSelect?.value ? `${wifiModuleSelect.value}` : ''
-    const iface = interfaceSelect?.value ? `${interfaceSelect.value}` : ''
-    return { projectId, dataType, brand, productLine, mainChip, wifiModule, interface: iface }
+    return { project, dataType, brand, productLine, mainChip }
+  }
+
+  const setProjectFilter = (value, label) => {
+    if (projectSelect) projectSelect.value = `${value ?? ''}`
+    if (projectDropdownToggle) projectDropdownToggle.textContent = `${label ?? 'Projects: All'}`
   }
 
   const search = query => {
@@ -140,14 +250,12 @@
     const url = new URL(`${API_BASE}/reports`, window.location.origin)
     url.searchParams.set('q', query)
     url.searchParams.set('limit', '8')
-    const { projectId, dataType, brand, productLine, mainChip, wifiModule, interface: iface } = getSearchParams()
-    if (projectId) url.searchParams.set('project_id', projectId)
+    const { project, dataType, brand, productLine, mainChip } = getSearchParams()
+    if (project) url.searchParams.set('project', project)
     if (dataType) url.searchParams.set('data_type', dataType)
     if (brand) url.searchParams.set('brand', brand)
     if (productLine) url.searchParams.set('product_line', productLine)
     if (mainChip) url.searchParams.set('main_chip', mainChip)
-    if (wifiModule) url.searchParams.set('wifi_module', wifiModule)
-    if (iface) url.searchParams.set('interface', iface)
 
     fetchJson(url.toString())
       .then(payload => {
@@ -162,10 +270,34 @@
       })
   }
 
+  const searchWithCurrentFilters = ({ query, limit = 20 } = {}) => {
+    const requestId = (activeRequest += 1)
+    const url = new URL(`${API_BASE}/reports`, window.location.origin)
+    url.searchParams.set('limit', `${limit}`)
+    const normalizedQuery = `${query ?? ''}`.trim()
+    if (normalizedQuery) url.searchParams.set('q', normalizedQuery)
+
+    const { project, dataType, brand, productLine, mainChip } = getSearchParams()
+    if (project) url.searchParams.set('project', project)
+    if (dataType) url.searchParams.set('data_type', dataType)
+    if (brand) url.searchParams.set('brand', brand)
+    if (productLine) url.searchParams.set('product_line', productLine)
+    if (mainChip) url.searchParams.set('main_chip', mainChip)
+
+    return fetchJson(url.toString())
+      .then(payload => {
+        if (requestId !== activeRequest) return null
+        return payload
+      })
+  }
+
   const loadRecent = () => {
     if (!recentGrid) return
     fetchJson(`${API_BASE}/reports/recent?limit=9`)
-      .then(payload => renderGrid(recentGrid, payload?.rows ?? []))
+      .then(payload => {
+        const rows = dedupeRecentRows(payload?.rows ?? [], 9)
+        renderGrid(recentGrid, rows)
+      })
       .catch(() => {
         recentGrid.innerHTML = `<div class="text-muted small">Failed to load recent reports.</div>`
       })
@@ -228,7 +360,7 @@
   const renderSelectedFilters = () => {
     if (!selectedFiltersEl) return
 
-    const { projectId, dataType, brand, productLine, mainChip, wifiModule, interface: iface } = getSearchParams()
+    const { project, dataType, brand, productLine, mainChip } = getSearchParams()
     const selected = []
 
     const pushFilter = (key, label, value, text) => {
@@ -236,16 +368,13 @@
       selected.push({ key, label, value, text: text ?? value })
     }
 
-    const projectText = projectId
-      ? projectSelect?.selectedOptions?.[0]?.textContent?.trim() ?? projectId
-      : ''
+    const projectLabelFromToggle = `${projectDropdownToggle?.textContent ?? ''}`.trim()
+    const projectText = project ? projectLabelFromToggle || project : ''
 
-    pushFilter('project_id', 'Project', projectId, projectText)
+    pushFilter('project', 'Project', project, projectText)
     pushFilter('brand', 'Brand', brand)
     pushFilter('product_line', 'Product Line', productLine)
     pushFilter('main_chip', 'Main Chip', mainChip)
-    pushFilter('wifi_module', 'Wi-Fi Module', wifiModule)
-    pushFilter('interface', 'Interface', iface)
     pushFilter('data_type', 'Type', dataType)
 
     if (selected.length === 0) {
@@ -268,12 +397,10 @@
   }
 
   const clearFilter = key => {
-    if (key === 'project_id' && projectSelect) projectSelect.value = ''
+    if (key === 'project') setProjectFilter('', 'Projects: All')
     if (key === 'brand' && brandSelect) brandSelect.value = ''
     if (key === 'product_line' && productLineSelect) productLineSelect.value = ''
     if (key === 'main_chip' && mainChipSelect) mainChipSelect.value = ''
-    if (key === 'wifi_module' && wifiModuleSelect) wifiModuleSelect.value = ''
-    if (key === 'interface' && interfaceSelect) interfaceSelect.value = ''
     if (key === 'data_type' && reportTypeSelect) reportTypeSelect.value = ''
     renderSelectedFilters()
   }
@@ -311,11 +438,18 @@
       search(query)
     })
 
-    projectSelect?.addEventListener('change', () => {
-      renderSelectedFilters()
-      const query = `${input?.value ?? ''}`.trim()
-      if (query) search(query)
-    })
+    if (projectDropdownMenu) {
+      projectDropdownMenu.addEventListener('click', event => {
+        const button = event.target?.closest?.('[data-project-value]')
+        if (!button) return
+        const value = `${button.getAttribute('data-project-value') ?? ''}`
+        const label = `${button.getAttribute('data-project-label') ?? 'Projects: All'}`
+        setProjectFilter(value, label)
+        renderSelectedFilters()
+        const query = `${input?.value ?? ''}`.trim()
+        if (query) search(query)
+      })
+    }
 
     reportTypeSelect?.addEventListener('change', () => {
       renderSelectedFilters()
@@ -341,26 +475,12 @@
       if (query) search(query)
     })
 
-    wifiModuleSelect?.addEventListener('change', () => {
-      renderSelectedFilters()
-      const query = `${input?.value ?? ''}`.trim()
-      if (query) search(query)
-    })
-
-    interfaceSelect?.addEventListener('change', () => {
-      renderSelectedFilters()
-      const query = `${input?.value ?? ''}`.trim()
-      if (query) search(query)
-    })
-
     resetButton?.addEventListener('click', () => {
-      if (projectSelect) projectSelect.value = ''
+      setProjectFilter('', 'Projects: All')
       if (reportTypeSelect) reportTypeSelect.value = ''
       if (brandSelect) brandSelect.value = ''
       if (productLineSelect) productLineSelect.value = ''
       if (mainChipSelect) mainChipSelect.value = ''
-      if (wifiModuleSelect) wifiModuleSelect.value = ''
-      if (interfaceSelect) interfaceSelect.value = ''
       if (input) input.value = ''
       activeRequest += 1
       setResultsVisible(false)
@@ -372,12 +492,17 @@
     fetchJson(`${API_BASE}/filters`)
       .then(payload => {
         const options = payload?.projectOptions ?? []
-        if (projectSelect) {
-          const optionEls = [
-            `<option value="">Projects: All</option>`,
-            ...options.map(option => `<option value="${option.value}">${option.label}</option>`)
+        if (projectDropdownMenu) {
+          const itemEls = [
+            `<li><button class="dropdown-item" type="button" data-project-value="" data-project-label="Projects: All">Projects: All</button></li>`,
+            ...options.map(option => {
+              const value = `${option?.value ?? ''}`
+              const label = `${option?.label ?? value}`
+              return `<li><button class="dropdown-item" type="button" data-project-value="${value}" data-project-label="${label}">${label}</button></li>`
+            }),
           ]
-          projectSelect.innerHTML = optionEls.join('')
+          projectDropdownMenu.innerHTML = itemEls.join('')
+          if (!projectSelect?.value) setProjectFilter('', 'Projects: All')
         }
 
         if (brandSelect) {
@@ -397,18 +522,6 @@
           const optionEls = [`<option value="">Main Chip: All</option>`, ...values.map(value => `<option value="${value}">${value}</option>`)]
           mainChipSelect.innerHTML = optionEls.join('')
         }
-
-        if (wifiModuleSelect) {
-          const values = Array.isArray(payload?.wifiModules) ? payload.wifiModules : []
-          const optionEls = [`<option value="">Wi-Fi Module: All</option>`, ...values.map(value => `<option value="${value}">${value}</option>`)]
-          wifiModuleSelect.innerHTML = optionEls.join('')
-        }
-
-        if (interfaceSelect) {
-          const values = Array.isArray(payload?.interfaces) ? payload.interfaces : []
-          const optionEls = [`<option value="">Interface: All</option>`, ...values.map(value => `<option value="${value}">${value}</option>`)]
-          interfaceSelect.innerHTML = optionEls.join('')
-        }
       })
       .catch(() => {})
 
@@ -424,7 +537,28 @@
 
     form?.addEventListener('submit', event => {
       event.preventDefault()
-      navigateToReport(input?.value ?? '')
+      const query = `${input?.value ?? ''}`.trim()
+      const hasFilters = Object.values(getSearchParams()).some(value => Boolean(`${value ?? ''}`))
+
+      if (!query && hasFilters) {
+        searchWithCurrentFilters({ query: '', limit: 18 })
+          .then(payload => {
+            if (!payload) return
+            renderGrid(recentGrid, payload?.rows ?? [])
+          })
+          .catch(() => {
+            if (recentGrid) recentGrid.innerHTML = `<div class="text-muted small">Search failed.</div>`
+          })
+        return
+      }
+
+      if (!query && !hasFilters) {
+        loadRecent()
+        loadFrequent()
+        return
+      }
+
+      navigateToReport(query)
     })
   }
 

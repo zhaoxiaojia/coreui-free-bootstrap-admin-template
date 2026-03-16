@@ -1,6 +1,20 @@
 (() => {
   const DEFAULT_API_BASE = new URL('/api', window.location.origin).toString()
-  const API_BASE = window.WIFI_API_BASE ?? window.WIFI_DASHBOARD_API_BASE ?? DEFAULT_API_BASE
+
+  const inferLocalApiBase = () => {
+    const hostname = window.location.hostname
+    const port = window.location.port
+
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') return ''
+    if (!port) return ''
+
+    const portsWithApi = new Set(['3000', '5000'])
+    if (portsWithApi.has(port)) return ''
+
+    return `${window.location.protocol}//${hostname}:5000/api`
+  }
+
+  const API_BASE = window.WIFI_API_BASE ?? window.WIFI_DASHBOARD_API_BASE ?? inferLocalApiBase() ?? DEFAULT_API_BASE
 
   const elements = {
     projectsGrid: document.getElementById('projectsGrid'),
@@ -148,12 +162,19 @@
     })
   }
 
-  const formatScore = score => {
+  const formatScoreByMetric = (metricLabel, score) => {
     if (score === null || score === undefined || Number.isNaN(Number(score))) return '-'
-    if (currentMetricLabel === 'composite_score') {
+    if (metricLabel === 'composite_score') {
       return Number(score).toFixed(0)
     }
     return Number(score).toFixed(2)
+  }
+
+  window.WIFI_DASHBOARD_SCORING = window.WIFI_DASHBOARD_SCORING ?? {}
+  window.WIFI_DASHBOARD_SCORING.formatScoreByMetric = formatScoreByMetric
+
+  const formatScore = score => {
+    return formatScoreByMetric(currentMetricLabel, score)
   }
 
   const safeNumber = value => {
@@ -416,6 +437,10 @@
 
   const refreshLeaderboards = async () => {
     if (leaderboardTarget) {
+      const currentHeight = leaderboardTarget.getBoundingClientRect().height
+      if (currentHeight > 0) {
+        leaderboardTarget.style.minHeight = `${Math.ceil(currentHeight)}px`
+      }
       leaderboardTarget.innerHTML = `
         <div class="d-flex align-items-center gap-2 text-muted small">
           <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -436,6 +461,7 @@
     const scoring = payload?.scoring ?? scenarioRules?.[selectedScenarioKey]?.scoring ?? null
     updateScoringPopover({ scoring, metricLabel })
     renderLeaderboard(leaderboardTarget, payload.rows ?? [])
+    if (leaderboardTarget) leaderboardTarget.style.minHeight = ''
   }
 
   const setLeaderboardError = error => {
@@ -451,6 +477,7 @@
         <div class="small mt-2 text-muted">API base: <code>${API_BASE}</code></div>
       </div>
     `
+    leaderboardTarget.style.minHeight = ''
   }
 
   const refreshAll = async () => {
@@ -474,7 +501,7 @@
     }
 
     if (elements.leaderboardTitle) {
-      elements.leaderboardTitle.textContent = `${scenario.label} Leaderboard`
+      elements.leaderboardTitle.textContent = `${scenario.label} Rankings`
     }
     if (elements.leaderboardSubtitle) {
       elements.leaderboardSubtitle.textContent = 'Score: Composite (0-1000)'
@@ -522,7 +549,7 @@
 
     const scenario = getSelectedScenario()
     if (elements.scenarioHint) elements.scenarioHint.textContent = scenario.hint ?? ''
-    if (elements.leaderboardTitle) elements.leaderboardTitle.textContent = `${scenario.label} Leaderboard`
+    if (elements.leaderboardTitle) elements.leaderboardTitle.textContent = `${scenario.label} Rankings`
     if (elements.leaderboardSubtitle) elements.leaderboardSubtitle.textContent = 'Score: Composite (0-1000)'
     updateScoringPopover({ scoring: null, metricLabel: 'loading' })
     initScoringPopover()

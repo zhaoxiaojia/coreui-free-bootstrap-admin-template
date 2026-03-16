@@ -13,14 +13,14 @@
   const API_BASE = window.WIFI_DASHBOARD_API_BASE ?? DEFAULT_API_BASE
   const DEFAULT_LIMIT = Number.parseInt(window.WIFI_DASHBOARD_MAX_POINTS ?? '1000', 10)
   const FILTER_PROMPT_MESSAGE = 'Choose filters and click "Apply Filters" to run the query.'
+  const FILTER_STATE_KEY = 'wifi-dashboard-filter-state'
+  const getFilterStateKey = () => `${FILTER_STATE_KEY}:${selectedDataType}`
 
   const form = document.getElementById('filtersForm')
   const productLineSelect = document.getElementById('filterProductLine')
   const projectSelect = document.getElementById('filterProject')
   const testReportSelect = document.getElementById('filterTestReport')
   const standardSelect = document.getElementById('filterStandard')
-  const deviceTypeSelect = document.getElementById('filterDeviceType')
-  const deviceValueSelect = document.getElementById('filterDeviceValue')
   const startDateInput = document.getElementById('filterStartDate')
   const endDateInput = document.getElementById('filterEndDate')
   const statusMessage = document.getElementById('statusMessage')
@@ -47,7 +47,7 @@
   const scenarioSections = new Map()
   const chartInstances = new Map()
   const chartEmptyStates = new Map()
-  const polarCharts = { uplink: null, downlink: null }
+  const polarChartInstances = new Map()
 
   const DATA_TYPE_OPTIONS = [
     { value: 'PEAK_THROUGHPUT', label: 'Peak Throughput' },
@@ -67,10 +67,32 @@
     return null
   }
 
+  const syncSidebarDataTypeLinks = () => {
+    const sidebarLinks = document.querySelectorAll(".sidebar .nav-group-items .nav-link[href*='wifi-dashboard.html?datatype=']")
+    sidebarLinks.forEach(link => {
+      let linkType = null
+      try {
+        const url = new URL(link.href, window.location.origin)
+        linkType = (url.searchParams.get('datatype') ?? url.searchParams.get('dataType') ?? '').toUpperCase()
+      } catch {
+        linkType = null
+      }
+
+      const isActive = Boolean(linkType) && linkType === selectedDataType
+      link.classList.toggle('active', isActive)
+      if (isActive) {
+        link.setAttribute('aria-current', 'page')
+      } else {
+        link.removeAttribute('aria-current')
+      }
+    })
+  }
+
   let latestDataset = []
   let isLoading = false
   let cachedFilterOptions = null
   let isSyncingFilters = false
+  let restoredFilterState = null
 
   const WEEKLY_TESTS_ENDPOINT = window.WIFI_WEEKLY_TESTS_ENDPOINT ?? `${API_BASE}/weekly-tests-summary`
 
@@ -954,6 +976,19 @@
     return normalized === 'uplink' || normalized === 'downlink' ? normalized : null
   }
 
+  const resolveEffectiveDirection = item => {
+    const normalized = normalizeDirection(item?.direction)
+    if (normalized) {
+      return normalized
+    }
+
+    if (selectedDataType === 'RVR' || selectedDataType === 'RVO') {
+      return 'uplink'
+    }
+
+    return null
+  }
+
   const deriveChannelFromFrequency = freqMhz => {
     if (!Number.isFinite(freqMhz)) {
       return null
@@ -989,17 +1024,50 @@
     return reportComponent
   }
 
-  const buildDatasetLabel = item => {
-    if (item.project) return item.project
+  const resolveScenarioDescriptor = item => {
+    const rawBandwidth =
+      parseScenarioGroupValue(item.scenarioGroupKey, 'BANDWIDTH') ??
+      parseScenarioGroupValue(item.scenarioGroupKey, 'BW')
+    const parsedBandwidth = Number.parseFloat(rawBandwidth ?? '')
+    const parsedChannel = Number.parseInt(parseScenarioGroupValue(item.scenarioGroupKey, 'CHANNEL') ?? '', 10)
+
+    return {
+      band: item.band ?? parseScenarioGroupValue(item.scenarioGroupKey, 'BAND') ?? null,
+      bandwidthMhz: Number.isFinite(item.bandwidthMhz)
+        ? item.bandwidthMhz
+        : (Number.isFinite(parsedBandwidth) ? parsedBandwidth : null),
+      standard: item.standard ?? parseScenarioGroupValue(item.scenarioGroupKey, 'STANDARD') ?? null,
+      channel: deriveChannelFromFrequency(item.centerFreqMhz) ?? (Number.isFinite(parsedChannel) ? parsedChannel : null)
+    }
+  }
+
+  const buildScenarioKey = item => {
+    const descriptor = resolveScenarioDescriptor(item)
     const parts = []
-    if (item.band) {
-      const bandLabel = formatBand(item.band) || item.band
+    if (descriptor.band) parts.push(`BAND=${String(descriptor.band).toUpperCase()}`)
+    if (descriptor.standard) parts.push(`STANDARD=${String(descriptor.standard).toUpperCase()}`)
+    if (Number.isFinite(descriptor.bandwidthMhz)) parts.push(`BW=${descriptor.bandwidthMhz}`)
+    if (parts.length > 0) return parts.join('|')
+    return item.casePath || item.scenarioGroupKey || 'scenario'
+  }
+
+  const buildDatasetLabel = item => {
+    const descriptor = resolveScenarioDescriptor(item)
+    const baseLabel =
+      item.project ||
+      item.reportName ||
+      (item.testReportId !== null && item.testReportId !== undefined ? `Report ${item.testReportId}` : 'Unknown Project')
+    if (descriptor.channel !== null && descriptor.channel !== undefined) {
+      return `${baseLabel} CH ${descriptor.channel}`
+    }
+    const parts = []
+    if (item.project) parts.push(item.project)
+    if (descriptor.band) {
+      const bandLabel = formatBand(descriptor.band) || descriptor.band
       if (bandLabel) parts.push(bandLabel)
     }
-    if (Number.isFinite(item.bandwidthMhz)) parts.push(`${item.bandwidthMhz}MHz`)
-    if (item.standard) parts.push(item.standard.toUpperCase())
-    const channel = deriveChannelFromFrequency(item.centerFreqMhz)
-    if (channel !== null) parts.push(`CH ${channel}`)
+    if (Number.isFinite(descriptor.bandwidthMhz)) parts.push(`${descriptor.bandwidthMhz}MHz`)
+    if (descriptor.standard) parts.push(String(descriptor.standard).toUpperCase())
     return parts.length > 0 ? parts.join(' ') : 'Unknown Project'
   }
 
@@ -1032,27 +1100,21 @@
   }
 
   const resolveScenarioIdentity = item => {
-    const scenarioKey = item.scenarioGroupKey || item.casePath || 'scenario'
+    const descriptor = resolveScenarioDescriptor(item)
+    const scenarioKey = buildScenarioKey(item)
     const labelParts = []
 
-    if (item.scenarioGroupKey) {
-      const compact = formatScenarioGroupKey(item.scenarioGroupKey)
-      if (compact) {
-        labelParts.push(compact)
-      }
+    if (descriptor.band) {
+      labelParts.push(formatBand(descriptor.band) || descriptor.band)
     }
-
-    if (item.casePath && !labelParts.some(part => part.toLowerCase() === item.casePath.toLowerCase())) {
+    if (descriptor.standard) {
+      labelParts.push(String(descriptor.standard).toUpperCase())
+    }
+    if (Number.isFinite(descriptor.bandwidthMhz)) {
+      labelParts.push(`${descriptor.bandwidthMhz}MHz`)
+    }
+    if (labelParts.length === 0 && item.casePath) {
       labelParts.push(item.casePath)
-    }
-
-    const channel = deriveChannelFromFrequency(item.centerFreqMhz)
-    if (
-      channel !== null &&
-      !labelParts.some(part => part.toLowerCase().includes(`ch ${channel}`.toLowerCase())) &&
-      !labelParts.some(part => part.toLowerCase().includes(`ch${channel}`.toLowerCase()))
-    ) {
-      labelParts.push(`CH ${channel}`)
     }
 
     if (labelParts.length === 0) {
@@ -1101,15 +1163,71 @@
     return {
       product_line: getSelectedValues(productLineSelect),
       project: getSelectedValues(projectSelect),
-      test_report_csv_name: testReportSelect ? getSelectedValues(testReportSelect) : [],
+      report_name: testReportSelect ? getSelectedValues(testReportSelect) : [],
       standard: getSelectedValues(standardSelect),
       data_type: selectedDataType,
-      device_type: deviceTypeSelect.value || '',
-      device_value: getSelectedValues(deviceValueSelect),
       start_date: startDateInput.value || '',
       end_date: endDateInput.value || '',
       limit: DEFAULT_LIMIT
     }
+  }
+
+  const saveFilterState = () => {
+    try {
+      const payload = {
+        dataType: selectedDataType,
+        productLines: getSelectedValues(productLineSelect),
+        projects: getSelectedValues(projectSelect),
+        reportNames: testReportSelect ? getSelectedValues(testReportSelect) : [],
+        standards: getSelectedValues(standardSelect),
+        startDate: startDateInput?.value || '',
+        endDate: endDateInput?.value || ''
+      }
+      sessionStorage.setItem(getFilterStateKey(), JSON.stringify(payload))
+    } catch {
+      // Ignore session storage failures.
+    }
+  }
+
+  const loadFilterState = () => {
+    try {
+      const raw = sessionStorage.getItem(getFilterStateKey())
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      return parsed && typeof parsed === 'object' ? parsed : null
+    } catch {
+      return null
+    }
+  }
+
+  const applyRestoredSelections = filterOptions => {
+    if (!restoredFilterState) {
+      return
+    }
+
+    const selectValues = (element, values, validOptions) => {
+      if (!element || !Array.isArray(values)) return
+      const valid = new Set((validOptions ?? []).map(item => `${item}`))
+      const next = values.filter(value => valid.has(`${value}`))
+      const controller = getMultiSelect(element)
+      if (controller) {
+        controller.setSelected(next, { silent: true })
+      }
+    }
+
+    selectValues(productLineSelect, restoredFilterState.productLines, filterOptions?.productLines)
+    selectValues(projectSelect, restoredFilterState.projects, filterOptions?.projects)
+    selectValues(testReportSelect, restoredFilterState.reportNames, filterOptions?.reportNames)
+    selectValues(standardSelect, restoredFilterState.standards, filterOptions?.standards)
+
+    if (startDateInput) {
+      startDateInput.value = restoredFilterState.startDate || ''
+    }
+    if (endDateInput) {
+      endDateInput.value = restoredFilterState.endDate || ''
+    }
+
+    restoredFilterState = null
   }
 
   const escapeHtml = value =>
@@ -1129,7 +1247,7 @@
     if (selectedFilesCount) selectedFilesCount.textContent = `${resolved.length}`
 
     if (resolved.length === 0) {
-      selectedFilesList.innerHTML = `<li class="list-group-item bg-transparent text-muted">${escapeHtml(placeholder)}</li>`
+      selectedFilesList.innerHTML = `<li class="list-group-item bg-transparent">${escapeHtml(placeholder)}</li>`
       return
     }
 
@@ -1214,30 +1332,6 @@
     }
   }
 
-  const refreshDeviceValueOptions = deviceOptions => {
-    const deviceType = deviceTypeSelect.value
-    const resolvedOptions = deviceOptions ?? cachedFilterOptions?.devices ?? {}
-    const options = resolvedOptions[deviceType] ?? []
-    const placeholder = deviceType === '' ? 'Select a device field first' : 'All Device Values'
-
-    setMultiSelectPlaceholder(deviceValueSelect, placeholder)
-
-    if (deviceType === '') {
-      setMultiSelectDisabled(deviceValueSelect, true)
-      clearMultiSelect(deviceValueSelect)
-      const controller = getMultiSelect(deviceValueSelect)
-      if (controller) {
-        controller.setOptions([], { preserveSelection: false })
-      } else {
-        populateSelect(deviceValueSelect, [], placeholder)
-      }
-      return
-    }
-
-    setMultiSelectDisabled(deviceValueSelect, false)
-    populateSelect(deviceValueSelect, options, placeholder)
-  }
-
   const fetchFilters = async () => {
     const filters = collectFilters()
     const queryString = buildQueryString(filters)
@@ -1265,7 +1359,7 @@
     const scenarios = new Map()
 
     data.forEach(item => {
-      const direction = normalizeDirection(item.direction)
+      const direction = resolveEffectiveDirection(item)
       if (!direction || !Number.isFinite(item.pathLossDb) || !Number.isFinite(item.throughputAvgMbps)) {
         return
       }
@@ -1330,6 +1424,59 @@
           Array.from(scenario.directions[direction].values()).map(group => ({
             label: group.label,
             points: group.points.sort((a, b) => a.x - b.x)
+          }))
+        ])
+      )
+    }))
+  }
+
+  const preparePolarScenarioGroups = data => {
+    const scenarios = new Map()
+
+    ;(data ?? []).forEach(item => {
+      const direction = resolveEffectiveDirection(item)
+      if (!direction || !Number.isFinite(item.angleDeg) || !Number.isFinite(item.throughputAvgMbps)) {
+        return
+      }
+
+      const identity = resolveScenarioIdentity(item)
+      const scenarioKey = identity.key || 'scenario'
+      if (!scenarios.has(scenarioKey)) {
+        scenarios.set(scenarioKey, {
+          key: scenarioKey,
+          label: identity.label || 'Scenario',
+          directions: {
+            uplink: new Map(),
+            downlink: new Map()
+          }
+        })
+      }
+
+      const bucket = scenarios.get(scenarioKey).directions[direction]
+      const seriesKey = buildSeriesKey(item)
+      if (!bucket.has(seriesKey)) {
+        bucket.set(seriesKey, {
+          label: buildDatasetLabel(item),
+          angles: new Map()
+        })
+      }
+
+      const angle = Number(item.angleDeg)
+      if (!bucket.get(seriesKey).angles.has(angle)) {
+        bucket.get(seriesKey).angles.set(angle, [])
+      }
+      bucket.get(seriesKey).angles.get(angle).push(Number(item.throughputAvgMbps))
+    })
+
+    return Array.from(scenarios.values()).map(scenario => ({
+      key: scenario.key,
+      label: scenario.label,
+      directions: Object.fromEntries(
+        ORDERED_DIRECTIONS.map(direction => [
+          direction,
+          Array.from(scenario.directions[direction].values()).map(group => ({
+            label: group.label,
+            angles: group.angles
           }))
         ])
       )
@@ -1599,20 +1746,23 @@
     const section = scenarioSections.get(scenarioKey)
     if (section) {
       section.section.remove()
-    scenarioSections.delete(scenarioKey)
+      scenarioSections.delete(scenarioKey)
+    }
+
+    const polarCharts = polarChartInstances.get(scenarioKey)
+    if (polarCharts) {
+      ORDERED_DIRECTIONS.forEach(direction => {
+        polarCharts[direction]?.destroy()
+      })
+      polarChartInstances.delete(scenarioKey)
+    }
+
+    chartEmptyStates.delete(scenarioKey)
   }
 
-  chartEmptyStates.delete(scenarioKey)
-}
-
   const clearAllCharts = () => {
-    const keys = Array.from(new Set([...chartInstances.keys(), ...scenarioSections.keys()]))
+    const keys = Array.from(new Set([...chartInstances.keys(), ...scenarioSections.keys(), ...polarChartInstances.keys()]))
     keys.forEach(key => removeScenarioCharts(key))
-
-    ORDERED_DIRECTIONS.forEach(direction => {
-      polarCharts[direction]?.destroy()
-      polarCharts[direction] = null
-    })
 
     if (chartGroupsContainer) {
       chartGroupsContainer.innerHTML = ''
@@ -1651,7 +1801,7 @@
             <td>${formatBand(item.band) || item.band || '-'}</td>
             <td>${Number.isFinite(item.bandwidthMhz) ? `${item.bandwidthMhz} MHz` : '-'}</td>
             <td>${item.standard ?? '-'}</td>
-            <td>${DIRECTION_SETTINGS[normalizeDirection(item.direction)]?.label ?? '-'}</td>
+            <td>${DIRECTION_SETTINGS[resolveEffectiveDirection(item)]?.label ?? '-'}</td>
             <td>${item.createdAt ? formatDateTime(item.createdAt) : '-'}</td>
           </tr>
         `).join('')}
@@ -1665,110 +1815,78 @@
     chartGroupsContainer.appendChild(wrapper)
   }
 
-  const ensurePolarSection = () => {
-    if (!chartGroupsContainer) {
+  const ensurePolarDirectionalChart = (scenarioKey, scenarioLabel, direction) => {
+    const section = ensureScenarioSection(scenarioKey, scenarioLabel)
+    if (!section) {
       return null
     }
 
-    if (chartGroupsContainer.querySelector('[data-polar-section="rvo"]')) {
-      return chartGroupsContainer.querySelector('[data-polar-section="rvo"]')
+    let scenarioCharts = polarChartInstances.get(scenarioKey)
+    if (!scenarioCharts) {
+      scenarioCharts = {}
+      polarChartInstances.set(scenarioKey, scenarioCharts)
     }
 
-    const section = document.createElement('div')
-    section.className = 'chart-scenario d-flex flex-column gap-3'
-    section.dataset.polarSection = 'rvo'
+    if (scenarioCharts[direction]) {
+      return scenarioCharts[direction]
+    }
 
-    const scenarioLabel = document.createElement('div')
-    scenarioLabel.className = 'small text-body-secondary fw-semibold'
-    scenarioLabel.dataset.scenarioLabel = 'rvo'
-    scenarioLabel.style.display = 'none'
-    section.appendChild(scenarioLabel)
+    const canvas = section.directionBlocks[direction]?.canvas
+    if (!canvas) {
+      return null
+    }
 
-    ORDERED_DIRECTIONS.forEach(direction => {
-      const directionSection = document.createElement('div')
-      directionSection.className = 'chart-section'
-
-      const directionTitle = document.createElement('h6')
-      directionTitle.className = 'fw-semibold mb-3'
-      directionTitle.textContent = `${DIRECTION_SETTINGS[direction].label} (Polar)`
-      directionSection.appendChild(directionTitle)
-
-      const container = document.createElement('div')
-      container.className = 'chart-container position-relative'
-      container.style.minHeight = '320px'
-
-      const canvas = document.createElement('canvas')
-      canvas.style.minHeight = '320px'
-      canvas.style.width = '100%'
-      canvas.id = `performancePolar-${direction}`
-      container.appendChild(canvas)
-
-      directionSection.appendChild(container)
-      section.appendChild(directionSection)
-
-      const chart = new Chart(canvas, {
-        type: 'radar',
-        data: { labels: [], datasets: [] },
-        options: {
-          maintainAspectRatio: false,
-          elements: {
-            line: { borderWidth: 2 },
-            point: { radius: 2 }
-          },
-          plugins: {
-            legend: { display: true, position: 'top' },
-            tooltip: {
-              callbacks: {
-                title: items => items?.[0]?.label ?? '',
-                label: context => `${context.dataset?.label ?? ''}: ${formatNumber(context.parsed?.r)} Mbps`
-              }
+    const chart = new Chart(canvas, {
+      type: 'radar',
+      data: { labels: [], datasets: [] },
+      options: {
+        maintainAspectRatio: false,
+        elements: {
+          line: { borderWidth: 2 },
+          point: { radius: 2 }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: coreui.Utils.getStyle('--cui-body-color')
             }
           },
-          scales: {
-            r: {
-              beginAtZero: true,
-              ticks: { display: true },
-              title: { display: true, text: 'Throughput (Mbps)' }
+          tooltip: {
+            callbacks: {
+              title: items => items?.[0]?.label ?? '',
+              label: context => `${context.dataset?.label ?? ''}: ${formatNumber(context.parsed?.r)} Mbps`
             }
           }
+        },
+        scales: {
+          r: {
+            beginAtZero: true,
+            ticks: { display: true },
+            pointLabels: {
+              display: true,
+              centerPointLabels: false,
+              color: coreui.Utils.getStyle('--cui-body-color'),
+              font: {
+                size: 11,
+                family: coreui.Utils.getStyle('--cui-body-font-family') || 'inherit'
+              }
+            },
+            title: { display: true, text: 'Throughput (Mbps)' }
+          }
         }
-      })
-
-      polarCharts[direction] = chart
+      }
     })
 
-    chartGroupsContainer.innerHTML = ''
-    chartGroupsContainer.appendChild(section)
-    return section
+    scenarioCharts[direction] = chart
+    return chart
   }
 
-  const resolveRvoScenarioLabel = data => {
-    const labels = Array.from(new Set((data ?? []).map(item => {
-      const compact = item.scenarioGroupKey ? formatScenarioGroupKey(item.scenarioGroupKey) : ''
-      if (compact) return compact
-      return resolveScenarioIdentity(item).label
-    }))).filter(Boolean)
-
-    if (labels.length === 1) {
-      return labels[0]
-    }
-
-    if (labels.length > 1) {
-      return `Multiple Scenarios (${labels.length})`
-    }
-
-    return ''
-  }
-
-  const updateRvoCharts = data => {
-    const section = ensurePolarSection()
-    if (section) {
-      const labelNode = section.querySelector('[data-scenario-label="rvo"]')
-      if (labelNode) {
-        const label = resolveRvoScenarioLabel(data)
-        labelNode.textContent = label
-        labelNode.style.display = label ? 'block' : 'none'
-      }
+  const updatePolarDirectionalChart = (scenarioKey, scenarioLabel, direction, groups) => {
+    const chart = ensurePolarDirectionalChart(scenarioKey, scenarioLabel, direction)
+    if (!chart) {
+      return
     }
 
     const palette = getColorPalette()
@@ -1777,56 +1895,60 @@
       if (color.startsWith('rgb(')) return color.replace('rgb(', 'rgba(').replace(')', ', 0.15)')
       return color
     }
+    const angles = [0, 45, 90, 135, 180, 225, 270, 315, 360]
+    const labels = angles.map(angle => `${formatNumber(angle, 0)}°`)
 
-    ORDERED_DIRECTIONS.forEach(direction => {
-      const points = (data ?? [])
-        .filter(item => normalizeDirection(item.direction) === direction)
-        .filter(item =>
-          Number.isFinite(item.angleDeg) &&
-          Number.isFinite(item.pathLossDb) &&
-          Number.isFinite(item.throughputAvgMbps)
-        )
+    const datasets = groups.map((group, index) => {
+      const color = palette[index % palette.length]?.border ?? '#321fdb'
+      return {
+        label: group.label,
+        data: angles.map(angle => {
+          const values = group.angles.get(angle) ?? []
+          if (values.length === 0) return null
+          const sum = values.reduce((acc, value) => acc + Number(value || 0), 0)
+          return sum / values.length
+        }),
+        borderColor: color,
+        backgroundColor: toFill(color),
+        pointBackgroundColor: color,
+        fill: false,
+        spanGaps: true
+      }
+    })
 
-      const angles = Array.from(new Set(points.map(item => Number(item.angleDeg)))).sort((a, b) => a - b)
-      const labels = angles.map(angle => `${formatNumber(angle, 0)}°`)
+    chart.data.labels = labels
+    chart.data.datasets = datasets
+    chart.options.plugins.legend.display = datasets.length > 0
+    chart.options.plugins.legend.labels.color = coreui.Utils.getStyle('--cui-body-color')
+    chart.options.scales.r.pointLabels.color = coreui.Utils.getStyle('--cui-body-color')
+    chart.update()
 
-      const lossGroups = new Map()
-      points.forEach(item => {
-        const channel = deriveChannelFromFrequency(item.centerFreqMhz)
-        const scenarioChannel = channel === null
-          ? Number.parseInt(parseScenarioGroupValue(item.scenarioGroupKey, 'CHANNEL') ?? '', 10)
-          : channel
-        const channelLabel = Number.isFinite(scenarioChannel) ? `CH${scenarioChannel}` : 'CH?'
-        const lossLabel = `${formatNumber(item.pathLossDb, 0)}dB`
-        const key = `${channelLabel} ${lossLabel}`
+    const emptyState = chartEmptyStates.get(scenarioKey)?.[direction]
+    if (emptyState) {
+      emptyState.style.display = datasets.length === 0 ? 'block' : 'none'
+    }
+  }
 
-        if (!lossGroups.has(key)) {
-          lossGroups.set(key, new Map())
-        }
-        lossGroups.get(key).set(Number(item.angleDeg), item.throughputAvgMbps)
+  const updateRvoCharts = data => {
+    const scenarios = preparePolarScenarioGroups(data)
+    const activeKeys = new Set(scenarios.map(item => item.key))
+    const knownKeys = new Set([...polarChartInstances.keys(), ...scenarioSections.keys()])
+    knownKeys.forEach(key => {
+      if (!activeKeys.has(key)) {
+        removeScenarioCharts(key)
+      }
+    })
+
+    scenarios.forEach(scenario => {
+      const record = ensureScenarioSection(scenario.key, scenario.label)
+      if (!record) {
+        return
+      }
+
+      chartGroupsContainer.appendChild(record.section)
+      ORDERED_DIRECTIONS.forEach(direction => {
+        updatePolarDirectionalChart(scenario.key, scenario.label, direction, scenario.directions[direction] ?? [])
       })
-
-      const datasets = Array.from(lossGroups.entries())
-        .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
-        .map(([label, map], index) => {
-        const color = palette[index % palette.length]?.border ?? '#321fdb'
-        const dataPoints = angles.map(angle => map.get(angle) ?? null)
-        return {
-          label,
-          data: dataPoints,
-          borderColor: color,
-          backgroundColor: toFill(color),
-          pointBackgroundColor: color,
-          fill: false,
-          spanGaps: true
-        }
-      })
-
-      const chart = polarCharts[direction]
-      if (!chart) return
-      chart.data.labels = labels
-      chart.data.datasets = datasets
-      chart.update()
     })
   }
 
@@ -1881,7 +2003,7 @@
     updateCharts(data)
   }
 
-  document.documentElement.addEventListener('ColorSchemeChange', () => {
+  document.addEventListener('app:themechange', () => {
     updateVisualization(latestDataset)
   })
 
@@ -1948,14 +2070,14 @@
         populateSelect(productLineSelect, filterOptions.productLines, 'All Product Lines')
         populateSelect(projectSelect, filterOptions.projects, 'All Projects')
         if (testReportSelect) {
-          populateSelect(testReportSelect, filterOptions.testReports ?? [], 'All Test Reports')
+          populateSelect(testReportSelect, filterOptions.reportNames ?? [], 'All Test Reports')
         }
         populateSelect(standardSelect, filterOptions.standards, 'All Standards')
-        refreshDeviceValueOptions(filterOptions.devices ?? {})
+        applyRestoredSelections(filterOptions)
 
         const selected = testReportSelect ? getSelectedValues(testReportSelect) : []
-        const filesToShow = selected.length > 0 ? selected : (filterOptions.testReports ?? [])
-        renderSelectedFiles(filesToShow, { placeholder: 'No matching files.' })
+        const filesToShow = selected.length > 0 ? selected : []
+        renderSelectedFiles(filesToShow, { placeholder: 'Select test reports and apply the filters.' })
         isSyncingFilters = false
       }
 
@@ -1963,7 +2085,12 @@
         const { data, metadata } = await fetchPerformanceData()
         latestDataset = data
         updateVisualization(data)
-        renderSelectedFiles((data ?? []).map(row => row.csvName).filter(Boolean), { placeholder: 'No data loaded.' })
+        const selectedReports = testReportSelect ? getSelectedValues(testReportSelect) : []
+        const reportsToShow = data.length > 0
+          ? (data ?? []).map(row => row.reportName ?? row.csvName).filter(Boolean)
+          : selectedReports
+        renderSelectedFiles(reportsToShow, { placeholder: 'No data loaded.' })
+        saveFilterState()
 
         if (data.length === 0) {
           setStatus('No data matched the current filters.')
@@ -1996,6 +2123,14 @@
 
   const handleFormSubmit = async event => {
     event.preventDefault()
+    const selectedReports = testReportSelect ? getSelectedValues(testReportSelect) : []
+    if (selectedReports.length === 0) {
+      latestDataset = []
+      updateVisualization([])
+      renderSelectedFiles([], { placeholder: 'Select test reports and apply the filters.' })
+      setStatus('Select at least one test report.')
+      return
+    }
     await loadFiltersAndData({ refreshFilters: false, refreshData: true })
   }
 
@@ -2004,18 +2139,8 @@
       multiSelectControllers.forEach(controller => {
         controller.clear(true)
       })
-      setMultiSelectPlaceholder(deviceValueSelect, 'Select a device field first')
-      setMultiSelectDisabled(deviceValueSelect, true)
       loadFiltersAndData({ refreshFilters: true, refreshData: false, initial: true })
     }, 0)
-  }
-
-  const handleDeviceTypeChange = () => {
-    loadFiltersAndData({
-      refreshFilters: true,
-      refreshData: false,
-      statusMessage: 'Device list updated. Select a device value and apply the filters.'
-    })
   }
 
   const handleCriteriaChange = () => {
@@ -2034,29 +2159,37 @@
     }
 
     selectedDataType = getSelectedDataTypeFromUrl() ?? selectedDataType
+    restoredFilterState = loadFilterState()
+    syncSidebarDataTypeLinks()
 
     registerMultiSelect(productLineSelect, { placeholder: 'All Product Lines' })
     registerMultiSelect(projectSelect, { placeholder: 'All Projects' })
     if (testReportSelect) {
-      registerMultiSelect(testReportSelect, { placeholder: 'All Test Reports' })
+      registerMultiSelect(testReportSelect, { placeholder: 'Select test reports' })
     }
     registerMultiSelect(standardSelect, { placeholder: 'All Standards' })
-    registerMultiSelect(deviceValueSelect, {
-      placeholder: 'Select a device field first',
-      showSelectAll: true
-    })
-    setMultiSelectDisabled(deviceValueSelect, true)
 
     form.addEventListener('submit', handleFormSubmit)
     form.addEventListener('reset', handleFormReset)
     refreshButton.addEventListener('click', () => {
+      const selectedReports = testReportSelect ? getSelectedValues(testReportSelect) : []
+      if (selectedReports.length === 0) {
+        setStatus('Select at least one test report.')
+        return
+      }
       loadFiltersAndData({ refreshFilters: false, refreshData: true })
     })
     exportButton.addEventListener('click', exportToExcel)
-    deviceTypeSelect.addEventListener('change', handleDeviceTypeChange)
     productLineSelect.addEventListener('change', handleCriteriaChange)
     projectSelect.addEventListener('change', handleCriteriaChange)
     testReportSelect?.addEventListener('change', handleCriteriaChange)
+    standardSelect.addEventListener('change', handleCriteriaChange)
+    startDateInput?.addEventListener('change', () => {
+      saveFilterState()
+    })
+    endDateInput?.addEventListener('change', () => {
+      saveFilterState()
+    })
 
     if (dataTypeTabs) {
       dataTypeTabs.querySelectorAll('[data-performance-datatype]').forEach(inner => {
@@ -2074,6 +2207,11 @@
             inner.classList.toggle('active', isActive)
             inner.setAttribute('aria-selected', isActive ? 'true' : 'false')
           })
+          const selectedReports = testReportSelect ? getSelectedValues(testReportSelect) : []
+          if (selectedReports.length === 0) {
+            setStatus('Select at least one test report.')
+            return
+          }
           loadFiltersAndData({ refreshFilters: false, refreshData: true })
         })
       })

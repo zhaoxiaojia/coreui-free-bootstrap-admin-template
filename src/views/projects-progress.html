@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<!--
+* CoreUI - Free Bootstrap Admin Template
+* @version v5.3.0
+* @link https://coreui.io/product/free-bootstrap-admin-template/
+* Licensed under MIT (https://github.com/coreui/coreui-free-bootstrap-admin-template/blob/main/LICENSE)
+-->
+
+<html lang="en">
+  <head>
+    <base href="./">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>Project Progress</title>
+    <link rel="stylesheet" href="node_modules/simplebar/dist/simplebar.css">
+    <link rel="stylesheet" href="css/vendors/simplebar.css">
+    <link href="css/style.css" rel="stylesheet">
+    <link href="css/examples.css" rel="stylesheet">
+    <script src="js/config.js"></script>
+  </head>
+  <body class="dashboard-page">
+    <div class="sidebar sidebar-dark sidebar-fixed border-end" id="sidebar">
+      <div class="sidebar-header border-bottom">
+        <div class="sidebar-brand">
+          <img class="sidebar-brand-full" src="assets/brand/amlogic.jpg" alt="Amlogic Logo">
+          <img class="sidebar-brand-narrow" src="assets/brand/amlogic.jpg" alt="Amlogic Logo">
+        </div>
+        <button class="btn-close d-lg-none" type="button" data-coreui-theme="dark" aria-label="Close" onclick="coreui.Sidebar.getInstance(document.querySelector(&quot;#sidebar&quot;)).toggle()"></button>
+      </div>
+      <ul class="sidebar-nav" data-coreui="navigation" data-simplebar>
+        <li class="nav-item"><a class="nav-link" href="index.html">
+            <svg class="nav-icon">
+              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-home"></use>
+            </svg> Home</a></li>
+        <li class="nav-group show"><a class="nav-link" href="wifi-dashboard.html">
+            <svg class="nav-icon">
+              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-wifi-signal-4"></use>
+            </svg> Wi-Fi Database</a>
+          <ul class="nav-group-items compact">
+            <li class="nav-item"><a class="nav-link" href="wifi-dashboard.html?datatype=PEAK_THROUGHPUT"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Peak Throughput</a></li>
+            <li class="nav-item"><a class="nav-link" href="wifi-dashboard.html?datatype=RVR"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> RVR</a></li>
+            <li class="nav-item"><a class="nav-link" href="wifi-dashboard.html?datatype=RVO"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> RVO</a></li>
+            <li class="nav-item"><a class="nav-link" href="wifi-ota.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> OTA</a></li>
+            <li class="nav-item"><a class="nav-link" href="wifi-function.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Function</a></li>
+            <li class="nav-item"><a class="nav-link" href="wifi-compatibility.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Compatibility</a></li>
+            <li class="nav-item"><a class="nav-link" href="wifi-home.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Home Environment</a></li>
+            <li class="nav-item"><a class="nav-link" href="wifi-interference.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Interference</a></li>
+            <li class="nav-item"><a class="nav-link active" href="projects-progress.html"><span class="nav-icon"><span class="nav-icon-bullet"></span></span> Product Lifecycle</a></li>
+          </ul>
+        </li>
+      </ul>
+      <div class="sidebar-footer border-top d-none d-md-flex">
+        <button class="sidebar-toggler" type="button" data-coreui-toggle="unfoldable"></button>
+      </div>
+    </div>
+
+    <div class="wrapper d-flex flex-column min-vh-100">
+      <header class="header header-sticky p-0 mb-4">
+        <div class="container-fluid border-bottom px-4">
+          <button class="header-toggler" type="button" onclick="coreui.Sidebar.getInstance(document.querySelector('#sidebar')).toggle()" style="margin-inline-start: -14px;">
+            <svg class="icon icon-lg">
+              <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-menu"></use>
+            </svg>
+          </button>
+          <div class="header-nav ms-auto">
+            <button class="btn btn-outline-secondary btn-sm" id="projectProgressRefresh" type="button">
+              <svg class="icon me-1">
+                <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-reload"></use>
+              </svg>Refresh
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div class="body flex-grow-1 px-4">
+        <div class="container-fluid">
+          <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+            <div>
+              <h1 class="h3 mb-1">Product Lifecycle</h1>
+              <div class="text-body-secondary small">Current phase: MP. The tags below still indicate which report types already have data.</div>
+            </div>
+            <div class="d-flex flex-column align-items-end gap-1">
+              <div class="small text-success fw-semibold">Current phase: MP</div>
+              <div class="text-body-secondary small" id="projectProgressStatus">Idle</div>
+            </div>
+          </div>
+
+          <div class="d-flex flex-wrap gap-2 mb-3" aria-label="Product lifecycle stages">
+            <span class="badge rounded-pill bg-light text-muted px-3 py-2">EVT</span>
+            <span class="badge rounded-pill bg-light text-muted px-3 py-2">DVT</span>
+            <span class="badge rounded-pill bg-light text-muted px-3 py-2">PVT</span>
+            <span class="badge rounded-pill bg-success text-white px-3 py-2">MP</span>
+          </div>
+
+          <div class="card">
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Project</th>
+                      <th style="width: 260px;">Progress</th>
+                      <th>Types</th>
+                    </tr>
+                  </thead>
+                  <tbody id="projectProgressTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="node_modules/@coreui/coreui/dist/js/coreui.bundle.min.js"></script>
+    <script src="node_modules/simplebar/dist/simplebar.min.js"></script>
+    <script src="js/projects-progress.js"></script>
+  </body>
+</html>

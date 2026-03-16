@@ -67,14 +67,17 @@ const theoreticalPhyRateSql = (weights, standardColumn = 'standard', bandwidthCo
 export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, limit }) => {
   const scenario = getLeaderboardScenario(scenarioKey) ?? getLeaderboardScenario('performance')
   const weights = compositeThroughputWeightsV1
+  const requireGolden = ['1', 'true', 'yes', 'on'].includes(String(process.env.API_REQUIRE_GOLDEN ?? '').toLowerCase())
 
   const perfFilter = buildPerformanceConditions(filters, { includeBase: false })
   const conditions = [...perfFilter.conditions]
   const params = [...perfFilter.params]
 
   // Base requirements for throughput-based composite scoring.
-  conditions.push('p.throughput_avg_mbps IS NOT NULL')
-  conditions.push('tc.is_golden = 1')
+  conditions.push('COALESCE(p.throughput_avg_mbps, p.throughput_peak_mbps, kv.throughput_mbps) IS NOT NULL')
+  if (requireGolden) {
+    conditions.push('tr.is_golden = 1')
+  }
 
   // Scenario-specific filters (can be extended later).
   if (scenario?.filters?.pathLossMin !== undefined) {
@@ -160,17 +163,23 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
           p.band,
           p.bandwidth_mhz,
           p.protocol,
-          AVG(p.throughput_avg_mbps) AS avg_throughput_avg_mbps,
-          AVG(COALESCE(p.throughput_peak_mbps, p.throughput_avg_mbps)) AS avg_throughput_peak_mbps,
+          AVG(COALESCE(p.throughput_avg_mbps, kv.throughput_mbps)) AS avg_throughput_avg_mbps,
+          AVG(COALESCE(p.throughput_peak_mbps, p.throughput_avg_mbps, kv.throughput_mbps)) AS avg_throughput_peak_mbps,
           MAX((${theoreticalPhyRate})) AS theoretical_phy_rate_mbps,
           (${defaultEfficiency}) AS protocol_efficiency,
           COUNT(*) AS sample_count,
           MAX(p.created_at) AS last_updated_at
         FROM performance p
-        INNER JOIN test_run ex ON ex.id = p.execution_id
-        INNER JOIN test_case tc ON tc.id = ex.test_case_id
-        INNER JOIN project pr ON pr.id = tc.project_id
+        INNER JOIN execution ex ON ex.id = p.execution_id
+        INNER JOIN test_report tr ON tr.id = ex.test_report_id
+        INNER JOIN project pr ON pr.id = tr.project_id
         INNER JOIN dut d ON d.id = ex.dut_id
+        LEFT JOIN (
+          SELECT execution_id, AVG(metric_value) AS throughput_mbps
+          FROM perf_metric_kv
+          WHERE metric_name = 'throughput'
+          GROUP BY execution_id
+        ) kv ON kv.execution_id = p.execution_id
         WHERE ${whereClause}
         GROUP BY
           pr.id,
@@ -208,13 +217,19 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
             p.band,
             p.bandwidth_mhz,
             p.protocol,
-            AVG(p.throughput_avg_mbps) AS avg_throughput_avg_mbps,
-            AVG(COALESCE(p.throughput_peak_mbps, p.throughput_avg_mbps)) AS avg_throughput_peak_mbps
+            AVG(COALESCE(p.throughput_avg_mbps, kv.throughput_mbps)) AS avg_throughput_avg_mbps,
+            AVG(COALESCE(p.throughput_peak_mbps, p.throughput_avg_mbps, kv.throughput_mbps)) AS avg_throughput_peak_mbps
         FROM performance p
-        INNER JOIN test_run ex ON ex.id = p.execution_id
-        INNER JOIN test_case tc ON tc.id = ex.test_case_id
-        INNER JOIN project pr ON pr.id = tc.project_id
+        INNER JOIN execution ex ON ex.id = p.execution_id
+        INNER JOIN test_report tr ON tr.id = ex.test_report_id
+        INNER JOIN project pr ON pr.id = tr.project_id
         INNER JOIN dut d ON d.id = ex.dut_id
+        LEFT JOIN (
+          SELECT execution_id, AVG(metric_value) AS throughput_mbps
+          FROM perf_metric_kv
+          WHERE metric_name = 'throughput'
+          GROUP BY execution_id
+        ) kv ON kv.execution_id = p.execution_id
         WHERE ${whereClause}
           GROUP BY
             pr.id,

@@ -1,10 +1,13 @@
 import { Router } from 'express'
 import pool from '../db.mjs'
+import { buildScenarioProjectLeaderboardQuery } from '../services/leaderboard-queries.mjs'
+import { normalizeFilters } from '../utils/filter-utils.mjs'
 
 const router = Router()
 
 const DEFAULT_LIMIT = Number.parseInt(process.env.API_REPORTS_DEFAULT_LIMIT ?? '10', 10)
 const MAX_LIMIT = Number.parseInt(process.env.API_REPORTS_MAX_LIMIT ?? '50', 10)
+const SCORE_QUERY_LIMIT = Number.parseInt(process.env.API_REPORTS_SCORE_LIMIT ?? '500', 10)
 
 const toIso = value => (value ? new Date(value).toISOString() : null)
 
@@ -16,9 +19,9 @@ const clampLimit = raw => {
 
 const reportFromSql = `
   FROM performance p
-  INNER JOIN test_run ex ON ex.id = p.execution_id
-  INNER JOIN test_case tc ON tc.id = ex.test_case_id
-  INNER JOIN project pr ON pr.id = tc.project_id
+  INNER JOIN execution ex ON ex.id = p.execution_id
+  INNER JOIN test_report tr ON tr.id = ex.test_report_id
+  INNER JOIN project pr ON pr.id = tr.project_id
   INNER JOIN dut d ON d.id = ex.dut_id
 `
 
@@ -27,9 +30,9 @@ const reportSelectSql = `
     p.execution_id AS report_id,
     p.data_type,
     MAX(p.csv_name) AS csv_name,
-    MAX(tc.case_path) AS case_path,
-    MAX(tc.report_name) AS report_name,
-    MAX(p.created_at) AS last_updated_at,
+    MAX(tr.case_path) AS case_path,
+    MAX(tr.report_name) AS report_name,
+    MAX(COALESCE(tr.updated_at, tr.created_at, ex.updated_at, ex.created_at, p.created_at)) AS last_updated_at,
     pr.id AS project_id,
     pr.brand,
     pr.product_line,
@@ -38,13 +41,13 @@ const reportSelectSql = `
     pr.wifi_module,
     pr.interface,
     pr.ecosystem,
-    pr.mass_production_status,
+    COALESCE(d.mass_production_status, pr.mass_production_status) AS mass_production_status,
     d.id AS dut_id,
+    d.serial_number AS dut_serial_number,
     d.connect_type AS dut_connect_type,
     d.software_version AS dut_software_version,
-    d.main_chip AS dut_main_chip,
-    d.wifi_module AS dut_wifi_module,
-    d.interface AS dut_interface
+    d.adb_device AS dut_adb_device,
+    d.telnet_ip AS dut_telnet_ip
   ${reportFromSql}
 `
 
@@ -60,46 +63,78 @@ const reportGroupBySql = `
     pr.wifi_module,
     pr.interface,
     pr.ecosystem,
+    d.mass_production_status,
     pr.mass_production_status,
     d.id,
+    d.serial_number,
     d.connect_type,
     d.software_version,
-    d.main_chip,
-    d.wifi_module,
-    d.interface
+    d.adb_device,
+    d.telnet_ip
 `
 
-const mapReportRow = row => ({
-  reportId: Number(row.report_id),
-  dataType: row.data_type ?? null,
-  csvName: row.csv_name ?? null,
-  reportName: row.report_name ?? null,
-  casePath: row.case_path ?? null,
-  lastUpdatedAt: toIso(row.last_updated_at),
-  project: row.project_id
-    ? {
-        projectId: Number(row.project_id),
-        brand: row.brand ?? null,
-        productLine: row.product_line ?? null,
-        projectName: row.project_name ?? null,
-        mainChip: row.main_chip ?? null,
-        wifiModule: row.wifi_module ?? null,
-        interface: row.interface ?? null,
-        ecosystem: row.ecosystem ?? null,
-        massProductionStatus: row.mass_production_status ?? null
-      }
-    : null,
-  dut: row.dut_id
-    ? {
-        dutId: Number(row.dut_id),
-        connectType: row.dut_connect_type ?? null,
-        softwareVersion: row.dut_software_version ?? null,
-        mainChip: row.dut_main_chip ?? null,
-        wifiModule: row.dut_wifi_module ?? null,
-        interface: row.dut_interface ?? null
-      }
-    : null
-})
+const toScoreKey = (projectId, dataType) => `${projectId}|${dataType}`
+
+const buildScoreMap = async (connection, rows) => {
+  const scoreMap = new Map()
+  const dataTypes = [...new Set(rows.map(row => `${row.data_type ?? ''}`.trim()).filter(Boolean))]
+  if (dataTypes.length === 0) return scoreMap
+
+  for (const dataType of dataTypes) {
+    const filters = normalizeFilters({ data_type: dataType })
+    const { sql, params } = buildScenarioProjectLeaderboardQuery({
+      scenarioKey: 'performance',
+      filters,
+      limit: SCORE_QUERY_LIMIT
+    })
+    const [scoreRows] = await connection.query(sql, params)
+    for (const row of scoreRows ?? []) {
+      if (!Number.isFinite(Number(row.project_id))) continue
+      scoreMap.set(toScoreKey(Number(row.project_id), dataType), row.score !== null ? Number(row.score) : null)
+    }
+  }
+
+  return scoreMap
+}
+
+const mapReportRow = (row, scoreMap) => {
+  const projectId = row.project_id ? Number(row.project_id) : null
+  const dataType = row.data_type ?? null
+  const scoreKey = projectId !== null && dataType ? toScoreKey(projectId, dataType) : null
+
+  return {
+    reportId: Number(row.report_id),
+    score: scoreKey ? (scoreMap.get(scoreKey) ?? null) : null,
+    dataType,
+    csvName: row.csv_name ?? null,
+    reportName: row.report_name ?? null,
+    casePath: row.case_path ?? null,
+    lastUpdatedAt: toIso(row.last_updated_at),
+    project: projectId
+      ? {
+          projectId,
+          brand: row.brand ?? null,
+          productLine: row.product_line ?? null,
+          projectName: row.project_name ?? null,
+          mainChip: row.main_chip ?? null,
+          wifiModule: row.wifi_module ?? null,
+          interface: row.interface ?? null,
+          ecosystem: row.ecosystem ?? null,
+          massProductionStatus: row.mass_production_status ?? null
+        }
+      : null,
+    dut: row.dut_id
+      ? {
+          dutId: Number(row.dut_id),
+          serialNumber: row.dut_serial_number ?? null,
+          connectType: row.dut_connect_type ?? null,
+          softwareVersion: row.dut_software_version ?? null,
+          adbDevice: row.dut_adb_device ?? null,
+          telnetIp: row.dut_telnet_ip ?? null
+        }
+      : null
+  }
+}
 
 router.get('/recent', async (req, res, next) => {
   const limit = clampLimit(req.query.limit)
@@ -109,17 +144,95 @@ router.get('/recent', async (req, res, next) => {
     try {
       const [rows] = await connection.query(
         `
-          ${reportSelectSql}
-          ${reportGroupBySql}
+          WITH base AS (
+            SELECT
+              p.execution_id AS report_id,
+              p.data_type,
+              MAX(p.csv_name) AS csv_name,
+              MAX(tr.case_path) AS case_path,
+              MAX(tr.report_name) AS report_name,
+              MAX(COALESCE(tr.updated_at, tr.created_at, ex.updated_at, ex.created_at, p.created_at)) AS last_updated_at,
+              tr.id AS test_report_id,
+              pr.id AS project_id,
+              pr.brand,
+              pr.product_line,
+              pr.project_name,
+              pr.main_chip,
+              pr.wifi_module,
+              pr.interface,
+              pr.ecosystem,
+              COALESCE(d.mass_production_status, pr.mass_production_status) AS mass_production_status,
+              d.id AS dut_id,
+              d.serial_number AS dut_serial_number,
+              d.connect_type AS dut_connect_type,
+              d.software_version AS dut_software_version,
+              d.adb_device AS dut_adb_device,
+              d.telnet_ip AS dut_telnet_ip
+            ${reportFromSql}
+            GROUP BY
+              p.execution_id,
+              p.data_type,
+              tr.id,
+              pr.id,
+              pr.brand,
+              pr.product_line,
+              pr.project_name,
+              pr.main_chip,
+              pr.wifi_module,
+              pr.interface,
+              pr.ecosystem,
+              d.mass_production_status,
+              pr.mass_production_status,
+              d.id,
+              d.serial_number,
+              d.connect_type,
+              d.software_version,
+              d.adb_device,
+              d.telnet_ip
+          ),
+          ranked AS (
+            SELECT
+              *,
+              ROW_NUMBER() OVER (
+                PARTITION BY test_report_id, data_type
+                ORDER BY last_updated_at DESC, report_id DESC
+              ) AS rn
+            FROM base
+          )
+          SELECT
+            report_id,
+            data_type,
+            csv_name,
+            case_path,
+            report_name,
+            last_updated_at,
+            project_id,
+            brand,
+            product_line,
+            project_name,
+            main_chip,
+            wifi_module,
+            interface,
+            ecosystem,
+            mass_production_status,
+            dut_id,
+            dut_serial_number,
+            dut_connect_type,
+            dut_software_version,
+            dut_adb_device,
+            dut_telnet_ip
+          FROM ranked
+          WHERE rn = 1
           ORDER BY last_updated_at DESC, report_id DESC
           LIMIT ?
         `,
         [limit]
       )
+      const scoreMap = await buildScoreMap(connection, rows ?? [])
 
       res.json({
         limit,
-        rows: rows.map(mapReportRow)
+        rows: (rows ?? []).map(row => mapReportRow(row, scoreMap))
       })
     } finally {
       connection.release()
@@ -133,7 +246,7 @@ router.get('/', async (req, res, next) => {
   const limit = clampLimit(req.query.limit)
   const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''
   const numericId = q && /^\d+$/.test(q) ? Number.parseInt(q, 10) : null
-  const projectId = req.query.project_id ?? req.query.projectId ?? null
+  const project = typeof req.query.project === 'string' ? req.query.project.trim() : ''
   const dataType = typeof req.query.data_type === 'string' ? req.query.data_type.trim() : (typeof req.query.dataType === 'string' ? req.query.dataType.trim() : '')
   const brand = typeof req.query.brand === 'string' ? req.query.brand.trim() : ''
   const productLine = typeof req.query.product_line === 'string' ? req.query.product_line.trim() : (typeof req.query.productLine === 'string' ? req.query.productLine.trim() : '')
@@ -156,20 +269,17 @@ router.get('/', async (req, res, next) => {
 
       if (q) {
         if (numericId !== null) {
-          conditions.push('(p.execution_id = ? OR p.csv_name LIKE ? OR p.data_type LIKE ? OR tc.report_name LIKE ?)')
+          conditions.push('(p.execution_id = ? OR p.csv_name LIKE ? OR p.data_type LIKE ? OR tr.report_name LIKE ?)')
           params.push(numericId, `%${q}%`, `%${q}%`, `%${q}%`)
         } else {
-          conditions.push('(p.csv_name LIKE ? OR p.data_type LIKE ? OR tc.report_name LIKE ?)')
+          conditions.push('(p.csv_name LIKE ? OR p.data_type LIKE ? OR tr.report_name LIKE ?)')
           params.push(`%${q}%`, `%${q}%`, `%${q}%`)
         }
       }
 
-      if (projectId !== null && projectId !== undefined && `${projectId}`.trim() !== '') {
-        const parsedProjectId = Number.parseInt(`${projectId}`, 10)
-        if (Number.isFinite(parsedProjectId)) {
-          conditions.push('pr.id = ?')
-          params.push(parsedProjectId)
-        }
+      if (project) {
+        conditions.push('pr.project_name = ?')
+        params.push(project)
       }
 
       if (dataType) {
@@ -208,7 +318,7 @@ router.get('/', async (req, res, next) => {
       }
 
       if (massProductionStatus) {
-        conditions.push('pr.mass_production_status = ?')
+        conditions.push('COALESCE(d.mass_production_status, pr.mass_production_status) = ?')
         params.push(massProductionStatus)
       }
 
@@ -229,10 +339,11 @@ router.get('/', async (req, res, next) => {
         `,
         [...params, limit]
       )
+      const scoreMap = await buildScoreMap(connection, rows ?? [])
 
       res.json({
         q,
-        projectId: projectId ? `${projectId}` : '',
+        project,
         dataType,
         brand,
         productLine,
@@ -243,7 +354,7 @@ router.get('/', async (req, res, next) => {
         massProductionStatus,
         dutConnectType,
         limit,
-        rows: rows.map(mapReportRow)
+        rows: (rows ?? []).map(row => mapReportRow(row, scoreMap))
       })
     } finally {
       connection.release()
@@ -278,12 +389,13 @@ router.get('/batch/by-ids', async (req, res, next) => {
         `,
         ids
       )
+      const scoreMap = await buildScoreMap(connection, rows ?? [])
 
       res.json({
         rows: ids
           .flatMap(id => {
-            const matches = rows.filter(row => Number(row.report_id) === id)
-            return matches.map(mapReportRow)
+            const matches = (rows ?? []).filter(row => Number(row.report_id) === id)
+            return matches.map(row => mapReportRow(row, scoreMap))
           })
       })
     } finally {
@@ -345,8 +457,9 @@ router.get('/:id', async (req, res, next) => {
         res.status(404).json({ error: 'Not found' })
         return
       }
+      const scoreMap = await buildScoreMap(connection, [row])
 
-      res.json(mapReportRow(row))
+      res.json(mapReportRow(row, scoreMap))
     } finally {
       connection.release()
     }
