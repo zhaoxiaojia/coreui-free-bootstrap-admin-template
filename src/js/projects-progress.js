@@ -25,8 +25,8 @@
       .map(item => {
         const label = escapeHtml(item?.label ?? item?.key ?? '')
         const cls = item?.done
-          ? 'bg-success text-white'
-          : 'bg-light text-muted'
+          ? 'lifecycle-pill lifecycle-pill-active'
+          : 'lifecycle-pill lifecycle-pill-idle'
         const title = item?.done ? `${label}: done` : `${label}: missing`
         return `<span class="badge rounded-pill ${cls} px-2 py-1" title="${escapeHtml(title)}" data-coreui-toggle="tooltip">${label}</span>`
       })
@@ -41,8 +41,8 @@
       <tr>
         <td class="fw-semibold">${escapeHtml(row?.project ?? '')}</td>
         <td style="min-width: 220px;">
-          <div class="progress" role="progressbar" aria-label="Progress" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100">
-            <div class="progress-bar bg-success" style="width: ${percent}%"></div>
+          <div class="progress lifecycle-progress" role="progressbar" aria-label="Progress" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar lifecycle-progress-fill" style="width: ${percent}%"></div>
           </div>
           <div class="small text-body-secondary mt-1">${doneCount}/${totalCount}</div>
         </td>

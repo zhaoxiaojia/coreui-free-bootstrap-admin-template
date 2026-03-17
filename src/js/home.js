@@ -511,7 +511,7 @@
     if (elements.scenarioTabs) {
       elements.scenarioTabs.querySelectorAll('[data-leaderboard-scenario]').forEach(button => {
         const isActive = button.dataset.leaderboardScenario === selectedScenarioKey
-        button.classList.toggle('active', isActive)
+        button.classList.toggle('is-active', isActive)
         button.setAttribute('aria-selected', isActive ? 'true' : 'false')
       })
     }
@@ -530,7 +530,7 @@
     if (elements.dataTypeTabs) {
       elements.dataTypeTabs.querySelectorAll('[data-leaderboard-datatype]').forEach(button => {
         const isActive = button.dataset.leaderboardDatatype === selectedDataType
-        button.classList.toggle('active', isActive)
+        button.classList.toggle('is-active', isActive)
         button.setAttribute('aria-selected', isActive ? 'true' : 'false')
       })
     }

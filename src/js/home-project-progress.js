@@ -42,10 +42,10 @@
       .map(item => {
         const label = escapeHtml(item?.label ?? item?.key ?? '')
         const cls = item?.done
-          ? 'bg-success text-white'
-          : 'bg-light text-muted'
+          ? 'app-control-chip is-active'
+          : 'app-control-chip'
         const title = item?.done ? `${label}: done` : `${label}: missing`
-        return `<span class="badge rounded-pill ${cls} px-2 py-1" title="${escapeHtml(title)}">${label}</span>`
+        return `<span class="${cls}" title="${escapeHtml(title)}">${label}</span>`
       })
       .join(' ')
 
@@ -55,15 +55,15 @@
     const percent = Math.round((doneCount / totalCount) * 100)
 
     return `
-      <a class="list-group-item list-group-item-action" href="projects-progress.html">
+      <a class="list-group-item list-group-item-action home-lifecycle-row" href="projects-progress.html">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
           <div class="min-w-0">
             <div class="fw-semibold text-truncate">${escapeHtml(row?.project ?? '')}</div>
             <div class="small text-body-secondary">${doneCount}/${totalCount} types</div>
           </div>
           <div class="d-flex flex-wrap align-items-center gap-2">
-            <div class="progress" style="width: 180px; height: 10px;" role="progressbar" aria-label="Progress" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100">
-              <div class="progress-bar bg-success" style="width: ${percent}%"></div>
+            <div class="progress home-lifecycle-progress" style="width: 180px; height: 10px;" role="progressbar" aria-label="Progress" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100">
+              <div class="progress-bar home-lifecycle-progress-fill" style="width: ${percent}%"></div>
             </div>
             <div class="d-flex flex-wrap gap-2">
               ${renderStepPills(row?.items ?? [])}
@@ -98,10 +98,7 @@
     if (!lifecycleFiltersEl) return
     lifecycleFiltersEl.querySelectorAll('[data-lifecycle-phase]').forEach(button => {
       const isActive = normalizePhase(button.getAttribute('data-lifecycle-phase')) === selectedPhase
-      button.classList.toggle('bg-success', isActive)
-      button.classList.toggle('text-white', isActive)
-      button.classList.toggle('bg-light', !isActive)
-      button.classList.toggle('text-muted', !isActive)
+      button.classList.toggle('is-active', isActive)
       button.setAttribute('aria-pressed', isActive ? 'true' : 'false')
     })
   }

@@ -7,16 +7,58 @@
 
 (() => {
   const THEME_SKIN_KEY = 'coreui-free-bootstrap-admin-template-theme-skin'
+  const MODE_KEY = 'coreui-free-bootstrap-admin-template-app-mode'
   const urlParams = new URLSearchParams(window.location.href.split('?')[1])
   const SIDEBAR_MODE_KEY = 'coreui-free-bootstrap-admin-template-sidebar-mode'
   const API_BASE_KEY = 'coreui-free-bootstrap-admin-template-api-base'
   const DEFAULT_THEME_SKIN = 'daylight'
-  const THEME_MODE_MAP = {
+  const FALLBACK_THEME_MODES = {
     daylight: 'light',
     nightfall: 'dark',
-    cobalt: 'light'
+    cobalt: 'dark',
+    spring: 'light',
+    rainbow: 'light',
+    midnight: 'dark',
+    sunshine: 'light'
   }
   const normalizeThemeSkin = value => (/^[a-z0-9-]+$/i.test(value || '') ? value : DEFAULT_THEME_SKIN)
+  const normalizeThemeMode = value => (value === 'dark' ? 'dark' : 'light')
+  const getConfiguredThemeMode = themeSkin => {
+    const configuredMode = window.APP_THEME_CONFIG?.themes?.[themeSkin]?.mode
+    return normalizeThemeMode(configuredMode ?? FALLBACK_THEME_MODES[themeSkin] ?? localStorage.getItem(MODE_KEY) ?? 'light')
+  }
+  const ensureStylesheet = href => {
+    if (document.querySelector(`link[href="${href}"]`)) return
+    const stylesheet = document.createElement('link')
+    stylesheet.rel = 'stylesheet'
+    stylesheet.href = href
+    document.head.append(stylesheet)
+  }
+  const ensureScript = (src, onload = null) => {
+    const existing = document.querySelector(`script[src="${src}"]`)
+    if (existing) {
+      if (onload) {
+        if (existing.dataset.loaded === 'true') onload()
+        else existing.addEventListener('load', onload, { once: true })
+      }
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = src
+    script.async = false
+    if (onload) {
+      script.addEventListener('load', () => {
+        script.dataset.loaded = 'true'
+        onload()
+      }, { once: true })
+    } else {
+      script.addEventListener('load', () => {
+        script.dataset.loaded = 'true'
+      }, { once: true })
+    }
+    document.head.append(script)
+  }
 
   const apiBaseFromUrl = (() => {
     const raw = urlParams.get('api_base') ?? urlParams.get('apiBase') ?? urlParams.get('api')
@@ -51,42 +93,31 @@
 
   const themeSkinFromUrl = urlParams.get('theme_skin') ?? urlParams.get('themeSkin')
   const themeSkin = normalizeThemeSkin(themeSkinFromUrl || localStorage.getItem(THEME_SKIN_KEY) || DEFAULT_THEME_SKIN)
+  const initialSidebarMode = (() => {
+    const modeFromUrl = urlParams.get('sidebar')
+    if (modeFromUrl === 'full' || modeFromUrl === 'minimal') return modeFromUrl
+    const stored = localStorage.getItem(SIDEBAR_MODE_KEY)
+    if (stored === 'full' || stored === 'minimal') return stored
+    return 'minimal'
+  })()
 
   document.documentElement.setAttribute('data-theme-skin', themeSkin)
-  document.documentElement.setAttribute('data-app-mode', THEME_MODE_MAP[themeSkin] || 'light')
+  document.documentElement.setAttribute('data-sidebar-mode', initialSidebarMode)
+  document.documentElement.setAttribute('data-sidebar-ready', initialSidebarMode === 'minimal' ? 'false' : 'true')
   localStorage.setItem(THEME_SKIN_KEY, themeSkin)
-
-  if (!document.querySelector('link[href="assets/css/theme.css"]')) {
-    const themeStylesheet = document.createElement('link')
-    themeStylesheet.rel = 'stylesheet'
-    themeStylesheet.href = 'assets/css/theme.css'
-    document.head.append(themeStylesheet)
-  }
-
-  if (!document.querySelector('script[src="js/theme-palette-config.js"]')) {
-    const themeConfigScript = document.createElement('script')
-    themeConfigScript.src = 'js/theme-palette-config.js'
-    themeConfigScript.async = false
-    document.head.append(themeConfigScript)
-  }
-
-  if (!document.querySelector('script[src="js/theme.js"]')) {
-    const themeScript = document.createElement('script')
-    themeScript.src = 'js/theme.js'
-    themeScript.async = false
-    document.head.append(themeScript)
-  }
+  document.documentElement.setAttribute('data-app-mode', getConfiguredThemeMode(themeSkin))
+  ensureStylesheet('assets/css/theme.css')
+  ensureScript('js/theme-palette-config.js', () => {
+    document.documentElement.setAttribute('data-app-mode', getConfiguredThemeMode(themeSkin))
+    ensureScript('js/theme.js')
+  })
 
   if (resolvedApiBase && !window.WIFI_DASHBOARD_API_BASE) {
     window.WIFI_DASHBOARD_API_BASE = resolvedApiBase
   }
 
   const getSidebarMode = () => {
-    const modeFromUrl = urlParams.get('sidebar')
-    if (modeFromUrl === 'full' || modeFromUrl === 'minimal') return modeFromUrl
-    const stored = localStorage.getItem(SIDEBAR_MODE_KEY)
-    if (stored === 'full' || stored === 'minimal') return stored
-    return 'minimal'
+    return initialSidebarMode
   }
 
   const ensureNavItem = ({ href, icon, label }, sidebarNav) => {
@@ -111,10 +142,16 @@
   }
 
   const applyMinimalSidebar = () => {
-    if (getSidebarMode() !== 'minimal') return
+    if (getSidebarMode() !== 'minimal') {
+      document.documentElement.setAttribute('data-sidebar-ready', 'true')
+      return
+    }
 
     const sidebarNav = document.querySelector('#sidebar ul.sidebar-nav')
-    if (!sidebarNav) return
+    if (!sidebarNav) {
+      document.documentElement.setAttribute('data-sidebar-ready', 'true')
+      return
+    }
 
     const homeItem =
       sidebarNav.querySelector('a.nav-link[href="index.html"]')?.closest('li') ??
@@ -152,6 +189,7 @@
 
       item.style.display = shouldShow ? '' : 'none'
     })
+    document.documentElement.setAttribute('data-sidebar-ready', 'true')
   }
 
   document.addEventListener('DOMContentLoaded', applyMinimalSidebar)

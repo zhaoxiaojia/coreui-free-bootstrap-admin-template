@@ -22,7 +22,7 @@
       cobalt: {
         label: 'Blue',
         description: 'Blue data-center palette',
-        mode: 'light',
+        mode: 'dark',
         paletteUrl: 'https://coolors.co/palette/03045e-023e8a-0077b6-0096c7-00b4d8-48cae4-90e0ef-ade8f4-caf0f8'
       }
     }
@@ -31,7 +31,7 @@
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
   const hexToRgb = hex => {
-    const normalized = hex.replace('#', '').trim()
+    const normalized = `${hex}`.replace('#', '').trim()
     const value = normalized.length === 3
       ? normalized.split('').map(char => char + char).join('')
       : normalized
@@ -40,7 +40,44 @@
     return {
       r: (parsed >> 16) & 255,
       g: (parsed >> 8) & 255,
-      b: parsed & 255
+      b: parsed & 255,
+      a: 1
+    }
+  }
+
+  const parseColor = color => {
+    if (!color) return { r: 0, g: 0, b: 0, a: 1 }
+
+    const value = `${color}`.trim()
+    if (value.startsWith('#')) {
+      return hexToRgb(value)
+    }
+
+    const rgbaMatch = value.match(/^rgba?\(([^)]+)\)$/i)
+    if (rgbaMatch) {
+      const [r = 0, g = 0, b = 0, a = 1] = rgbaMatch[1]
+        .split(',')
+        .map(part => Number.parseFloat(part.trim()))
+      return {
+        r: clamp(Number.isFinite(r) ? r : 0, 0, 255),
+        g: clamp(Number.isFinite(g) ? g : 0, 0, 255),
+        b: clamp(Number.isFinite(b) ? b : 0, 0, 255),
+        a: clamp(Number.isFinite(a) ? a : 1, 0, 1)
+      }
+    }
+
+    return hexToRgb(value)
+  }
+
+  const compositeColor = (foreground, background) => {
+    const fg = parseColor(foreground)
+    const bg = parseColor(background)
+    const alpha = fg.a ?? 1
+    return {
+      r: fg.r * alpha + bg.r * (1 - alpha),
+      g: fg.g * alpha + bg.g * (1 - alpha),
+      b: fg.b * alpha + bg.b * (1 - alpha),
+      a: 1
     }
   }
 
@@ -51,8 +88,8 @@
 
   const mix = (colorA, colorB, ratio = 0.5) => {
     const weight = clamp(ratio, 0, 1)
-    const left = hexToRgb(colorA)
-    const right = hexToRgb(colorB)
+    const left = parseColor(colorA)
+    const right = parseColor(colorB)
     return rgbToHex({
       r: left.r + (right.r - left.r) * weight,
       g: left.g + (right.g - left.g) * weight,
@@ -61,17 +98,17 @@
   }
 
   const toRgba = (hex, alpha) => {
-    const { r, g, b } = hexToRgb(hex)
+    const { r, g, b } = parseColor(hex)
     return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1)})`
   }
 
   const toRgbChannels = hex => {
-    const { r, g, b } = hexToRgb(hex)
+    const { r, g, b } = parseColor(hex)
     return `${r}, ${g}, ${b}`
   }
 
-  const luminance = hex => {
-    const { r, g, b } = hexToRgb(hex)
+  const luminance = color => {
+    const { r, g, b } = parseColor(color)
     const channels = [r, g, b].map(value => {
       const normalized = value / 255
       return normalized <= 0.03928
@@ -84,6 +121,42 @@
   const contrastColor = (background, dark = '#0f172a', light = '#ffffff') => {
     return luminance(background) > 0.45 ? dark : light
   }
+
+  const contrastRatio = (colorA, colorB) => {
+    const left = luminance(colorA)
+    const right = luminance(colorB)
+    const lighter = Math.max(left, right)
+    const darker = Math.min(left, right)
+    return (lighter + 0.05) / (darker + 0.05)
+  }
+
+  const resolveStateTextColor = (background, mode) => {
+    const baseSurface = mode === 'dark' ? '#111b2e' : '#ffffff'
+    const effectiveBackground = `${background}`.includes('rgba(')
+      ? compositeColor(background, baseSurface)
+      : parseColor(background)
+    const normalizedBackground = rgbToHex(effectiveBackground)
+    const darkInk = '#0f172a'
+    const lightInk = '#ffffff'
+    return contrastRatio(normalizedBackground, darkInk) >= contrastRatio(normalizedBackground, lightInk)
+      ? darkInk
+      : lightInk
+  }
+
+  const buildInteractiveStateTokens = ({ mode, bg, hoverBg, activeBg, border, activeBorder, ring, disabledBg }) => ({
+    '--app-control-bg': bg,
+    '--app-control-hover-bg': hoverBg,
+    '--app-control-active-bg': activeBg,
+    '--app-control-border': border,
+    '--app-control-active-border': activeBorder,
+    '--app-control-text': resolveStateTextColor(bg, mode),
+    '--app-control-hover-text': resolveStateTextColor(hoverBg, mode),
+    '--app-control-active-text': resolveStateTextColor(activeBg, mode),
+    '--app-control-ring': ring,
+    '--app-control-disabled-bg': disabledBg,
+    '--app-control-disabled-text': resolveStateTextColor(disabledBg, mode),
+    '--app-control-disabled-border': border
+  })
 
   const normalizeHex = value => {
     const hex = `${value}`.trim().replace('#', '')
@@ -123,6 +196,155 @@
   const pick = (colors, index) => colors[clamp(index, 0, colors.length - 1)]
   const strengthen = (color, against, amount = 0.22) => mix(color, against, amount)
   const paletteAt = (colors, index) => colors[clamp(index, 0, colors.length - 1)]
+  const extractPaletteColorsFromUrl = parseCoolorsPaletteUrl
+
+  const buildContainerThemeTokens = ({ mode, darkest, dark, c0, c1, c2, c4 }) => {
+    if (mode === 'dark') {
+      const body = '#0b1220'
+      const surface = '#111b2e'
+      const panel = '#162338'
+      const panelStrong = '#1d2d47'
+      const nav = surface
+      const sidebar = surface
+      const sidebarSurface = panel
+      return {
+        '--app-body-bg': body,
+        '--app-body-bg-rgb': toRgbChannels(body),
+        '--app-surface': surface,
+        '--app-surface-alt': mix(surface, panel, 0.42),
+        '--app-surface-glass': toRgba(surface, 0.88),
+        '--app-panel': panel,
+        '--app-panel-strong': panelStrong,
+        '--app-text': '#e5e7eb',
+        '--app-mode-text': '#e5e7eb',
+        '--app-text-muted': '#9ca3af',
+        '--app-heading': '#f9fafb',
+        '--app-border': toRgba('#dbe7ff', 0.14),
+        '--app-border-strong': toRgba('#dbe7ff', 0.24),
+        '--app-shadow': `0 24px 48px -28px ${toRgba(darkest, 0.82)}`,
+        '--app-shadow-soft': `0 16px 32px -24px ${toRgba(darkest, 0.66)}`,
+        '--app-nav-bg': nav,
+        '--app-nav-text': '#e5e7eb',
+        '--app-hero-start': mix(surface, c2, 0.14),
+        '--app-hero-end': mix(surface, c4, 0.2),
+        '--app-hero-text': '#f9fafb',
+        '--app-hero-muted': '#9ca3af',
+        '--app-sidebar-bg': sidebar,
+        '--app-sidebar-surface': sidebarSurface,
+        '--app-sidebar-text': '#e5e7eb',
+        '--app-sidebar-muted': '#9ca3af'
+      }
+    }
+
+    const body = '#f6f8fb'
+    const surface = '#ffffff'
+    const panel = '#f2f5fa'
+    const panelStrong = '#e7edf6'
+    const nav = surface
+    const sidebar = surface
+    const sidebarSurface = panel
+    return {
+      '--app-body-bg': body,
+      '--app-body-bg-rgb': toRgbChannels(body),
+      '--app-surface': surface,
+      '--app-surface-alt': mix(surface, panel, 0.72),
+      '--app-surface-glass': toRgba(surface, 0.9),
+      '--app-panel': panel,
+      '--app-panel-strong': panelStrong,
+      '--app-text': '#111827',
+      '--app-mode-text': '#0f172a',
+      '--app-text-muted': '#475569',
+      '--app-heading': '#0f172a',
+      '--app-border': 'rgba(15, 23, 42, 0.10)',
+      '--app-border-strong': 'rgba(15, 23, 42, 0.18)',
+      '--app-shadow': `0 20px 45px -28px ${toRgba(dark, 0.3)}`,
+      '--app-shadow-soft': `0 14px 32px -24px ${toRgba(dark, 0.2)}`,
+      '--app-nav-bg': nav,
+      '--app-nav-text': '#111827',
+      '--app-hero-start': mix(panel, c1, 0.08),
+      '--app-hero-end': mix(panel, c4, 0.12),
+      '--app-hero-text': '#0f172a',
+      '--app-hero-muted': '#475569',
+      '--app-sidebar-bg': sidebar,
+      '--app-sidebar-surface': sidebarSurface,
+      '--app-sidebar-text': '#111827',
+      '--app-sidebar-muted': '#475569'
+    }
+  }
+
+  const buildPaletteControlTokens = ({ mode, darkest, colors, c1, c3, c4, c5, c6, c7, c8 }) => {
+    if (mode === 'dark') {
+      const controlIdleBg = toRgba(c3, 0.28)
+      const controlHoverBg = toRgba(c4, 0.34)
+      const controlActiveBg = c4
+      return {
+        ...buildInteractiveStateTokens({
+          mode,
+          bg: controlIdleBg,
+          hoverBg: controlHoverBg,
+          activeBg: controlActiveBg,
+          border: toRgba(c5, 0.28),
+          activeBorder: toRgba(c6, 0.42),
+          ring: toRgba(c5, 0.22),
+          disabledBg: toRgba(c5, 0.12)
+        }),
+        '--app-chip-bg': toRgba(c6, 0.18),
+        '--app-chip-active-bg': c4,
+        '--app-progress-track': toRgba(c5, 0.12),
+        '--app-progress-fill': `linear-gradient(90deg, ${c3}, ${c4})`,
+        '--app-motion-glow': `0 0 0 0.18rem ${toRgba(c5, 0.18)}`,
+        '--app-brand': c4,
+        '--app-brand-strong': contrastColor(c4, '#0f172a', '#ffffff'),
+        '--app-on-brand': contrastColor(c4, '#0f172a', '#ffffff'),
+        '--app-brand-soft': toRgba(c4, 0.22),
+        '--app-accent': mix(c1, c5, 0.18),
+        '--app-accent-soft': toRgba(mix(c1, c5, 0.18), 0.22),
+        '--app-success': c6,
+        '--app-warning': c8,
+        '--app-danger': mix(c1, darkest, 0.42),
+        '--app-info': c3,
+        '--app-rank-bg': toRgba(c4, 0.16),
+        '--app-chart-1': c1,
+        '--app-chart-2': c3,
+        '--app-chart-3': c5,
+        '--app-chart-4': c7
+      }
+    }
+
+    const controlActiveBg = c4
+    return {
+      ...buildInteractiveStateTokens({
+        mode,
+        bg: mix(c8, c6, 0.34),
+        hoverBg: mix(c7, c5, 0.4),
+        activeBg: controlActiveBg,
+        border: toRgba(c5, 0.2),
+        activeBorder: toRgba(c4, 0.34),
+        ring: toRgba(c4, 0.18),
+        disabledBg: mix(c8, c7, 0.3)
+      }),
+      '--app-chip-bg': mix(c8, c6, 0.26),
+      '--app-chip-active-bg': c4,
+      '--app-progress-track': toRgba(c5, 0.14),
+      '--app-progress-fill': `linear-gradient(90deg, ${c3}, ${c4})`,
+      '--app-motion-glow': `0 0 0 0.18rem ${toRgba(c4, 0.16)}`,
+      '--app-brand': strengthen(c3, c1, 0.2),
+      '--app-brand-strong': contrastColor(strengthen(c3, c1, 0.2), '#0f172a', '#ffffff'),
+      '--app-on-brand': contrastColor(strengthen(c3, c1, 0.2), '#0f172a', '#ffffff'),
+      '--app-brand-soft': toRgba(strengthen(c3, c1, 0.2), 0.18),
+      '--app-accent': strengthen(c5, c1, 0.18),
+      '--app-accent-soft': toRgba(strengthen(c5, c1, 0.18), 0.18),
+      '--app-success': c6,
+      '--app-warning': c8,
+      '--app-danger': strengthen(c4, darkest, 0.18),
+      '--app-info': strengthen(c5, c1, 0.18),
+      '--app-rank-bg': toRgba(c4, 0.14),
+      '--app-chart-1': colors[0] ?? c1,
+      '--app-chart-2': colors[2] ?? c3,
+      '--app-chart-3': colors[4] ?? c5,
+      '--app-chart-4': colors[6] ?? c7
+    }
+  }
 
   const buildDarkTokens = ({ darkest, dark, mid, light, lightest, brand, accent, support, colors }) => {
     const c0 = paletteAt(colors, 0)
@@ -134,66 +356,15 @@
     const c6 = paletteAt(colors, 6)
     const c7 = paletteAt(colors, 7)
     const c8 = paletteAt(colors, colors.length - 1)
-    const body = '#0b1220'
-    const surface = '#111b2e'
-    const panel = '#162338'
-    const panelStrong = '#1d2d47'
-    const heroStart = mix(surface, c2, 0.14)
-    const heroEnd = mix(surface, c4, 0.2)
-    const text = '#e5e7eb'
-    const heading = '#f9fafb'
-    const brandSolid = c4
-    const accentSolid = mix(c2, c5, 0.18)
-    const onBrand = contrastColor(brandSolid, '#0f172a', '#ffffff')
-
     return {
       '--app-theme-name': 'Dynamic Theme',
-      '--app-body-bg': body,
-      '--app-body-bg-rgb': toRgbChannels(body),
-      '--app-surface': surface,
-      '--app-surface-alt': mix(surface, panel, 0.42),
-      '--app-surface-glass': toRgba(surface, 0.88),
-      '--app-panel': panel,
-      '--app-panel-strong': panelStrong,
+      ...buildContainerThemeTokens({ mode: 'dark', darkest, dark, c0, c1, c2, c4 }),
       '--app-muted-surface': toRgba(c5, 0.16),
-      '--app-text': text,
-      '--app-mode-text': '#e5e7eb',
-      '--app-text-muted': '#9ca3af',
-      '--app-heading': heading,
-      '--app-border': toRgba('#dbe7ff', 0.14),
-      '--app-border-strong': toRgba('#dbe7ff', 0.24),
-      '--app-shadow': `0 24px 48px -28px ${toRgba(darkest, 0.82)}`,
-      '--app-shadow-soft': `0 16px 32px -24px ${toRgba(darkest, 0.66)}`,
-      '--app-brand': brandSolid,
-      '--app-brand-strong': onBrand,
-      '--app-on-brand': onBrand,
-      '--app-brand-soft': toRgba(brandSolid, 0.22),
-      '--app-accent': accentSolid,
-      '--app-accent-soft': toRgba(accentSolid, 0.22),
-      '--app-success': support,
-      '--app-warning': light,
-      '--app-danger': mix(brand, darkest, 0.42),
-      '--app-info': accent,
-      '--app-nav-bg': toRgba('#132034', 0.95),
-      '--app-nav-text': text,
       '--app-nav-hover': support,
-      '--app-sidebar-bg': darkest,
-      '--app-sidebar-surface': dark,
-      '--app-sidebar-text': text,
       '--app-sidebar-muted': '#9ca3af',
       '--app-sidebar-hover': toRgba(support, 0.18),
       '--app-sidebar-active': `linear-gradient(135deg, ${brand}, ${support})`,
-      '--app-hero-start': heroStart,
-      '--app-hero-end': heroEnd,
-      '--app-hero-text': heading,
-      '--app-hero-muted': '#9ca3af',
-      '--app-chip-bg': toRgba(c6, 0.22),
-      '--app-chip-active-bg': brandSolid,
-      '--app-rank-bg': toRgba(brandSolid, 0.16),
-      '--app-chart-1': c1,
-      '--app-chart-2': c3,
-      '--app-chart-3': c5,
-      '--app-chart-4': c7,
+      ...buildPaletteControlTokens({ mode: 'dark', darkest, colors, c1, c3, c4, c5, c6, c7, c8 }),
       '--app-palette-1': c0,
       '--app-palette-2': c1,
       '--app-palette-3': c2,
@@ -216,67 +387,15 @@
     const c6 = paletteAt(colors, 6)
     const c7 = paletteAt(colors, 7)
     const c8 = paletteAt(colors, colors.length - 1)
-    const body = '#f6f8fb'
-    const surface = '#ffffff'
-    const panel = '#f2f5fa'
-    const panelStrong = '#e7edf6'
-    const heroStart = mix(panel, c2, 0.08)
-    const heroEnd = mix(panel, c4, 0.12)
-    const text = '#111827'
-    const heading = '#0f172a'
-    const brandSolid = strengthen(c3, c1, 0.2)
-    const accentSolid = strengthen(c5, c2, 0.18)
-    const sidebarBase = strengthen(c1, c0, 0.2)
-    const onBrand = contrastColor(brandSolid, '#0f172a', '#ffffff')
-
     return {
       '--app-theme-name': 'Dynamic Theme',
-      '--app-body-bg': body,
-      '--app-body-bg-rgb': toRgbChannels(body),
-      '--app-surface': surface,
-      '--app-surface-alt': mix(surface, panel, 0.72),
-      '--app-surface-glass': toRgba(surface, 0.9),
-      '--app-panel': panel,
-      '--app-panel-strong': panelStrong,
+      ...buildContainerThemeTokens({ mode: 'light', darkest, dark, c0, c1, c2, c4 }),
       '--app-muted-surface': toRgba(c6, 0.16),
-      '--app-text': text,
-      '--app-mode-text': '#0f172a',
-      '--app-text-muted': '#475569',
-      '--app-heading': heading,
-      '--app-border': 'rgba(15, 23, 42, 0.10)',
-      '--app-border-strong': 'rgba(15, 23, 42, 0.18)',
-      '--app-shadow': `0 20px 45px -28px ${toRgba(dark, 0.3)}`,
-      '--app-shadow-soft': `0 14px 32px -24px ${toRgba(dark, 0.2)}`,
-      '--app-brand': brandSolid,
-      '--app-brand-strong': onBrand,
-      '--app-on-brand': onBrand,
-      '--app-brand-soft': toRgba(brandSolid, 0.18),
-      '--app-accent': accentSolid,
-      '--app-accent-soft': toRgba(accentSolid, 0.18),
-      '--app-success': support,
-      '--app-warning': light,
-      '--app-danger': strengthen(brandSolid, darkest, 0.18),
-      '--app-info': accentSolid,
-      '--app-nav-bg': 'rgba(255, 255, 255, 0.92)',
-      '--app-nav-text': text,
-      '--app-nav-hover': brandSolid,
-      '--app-sidebar-bg': sidebarBase,
-      '--app-sidebar-surface': brandSolid,
-      '--app-sidebar-text': text,
+      '--app-nav-hover': strengthen(c3, c1, 0.2),
       '--app-sidebar-muted': '#475569',
       '--app-sidebar-hover': toRgba(support, 0.2),
-      '--app-sidebar-active': `linear-gradient(135deg, ${brandSolid}, ${accentSolid})`,
-      '--app-hero-start': heroStart,
-      '--app-hero-end': heroEnd,
-      '--app-hero-text': heading,
-      '--app-hero-muted': '#475569',
-      '--app-chip-bg': mix(c8, c6, 0.3),
-      '--app-chip-active-bg': brandSolid,
-      '--app-rank-bg': toRgba(brandSolid, 0.14),
-      '--app-chart-1': c0,
-      '--app-chart-2': c2,
-      '--app-chart-3': c4,
-      '--app-chart-4': c6,
+      '--app-sidebar-active': `linear-gradient(135deg, ${strengthen(c3, c1, 0.2)}, ${strengthen(c5, c2, 0.18)})`,
+      ...buildPaletteControlTokens({ mode: 'light', darkest, colors, c1, c3, c4, c5, c6, c7, c8 }),
       '--app-palette-1': c0,
       '--app-palette-2': c1,
       '--app-palette-3': c2,
@@ -439,7 +558,10 @@
   window.APP_THEME = {
     applyTheme,
     initializeTheme,
+    extractPaletteColorsFromUrl,
     parseCoolorsPaletteUrl,
+    buildContainerThemeTokens,
+    buildPaletteControlTokens,
     buildThemeTokens,
     getResolvedTheme,
     get themes() {

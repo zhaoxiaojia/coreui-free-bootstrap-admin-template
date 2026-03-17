@@ -18,8 +18,65 @@
     <link href="css/style.css" rel="stylesheet">
     <link href="css/examples.css" rel="stylesheet">
     <script src="js/config.js"></script>
+    <style>
+      .projects-progress-page {
+        background: var(--app-body-bg);
+        color: var(--app-text);
+      }
+
+      .projects-progress-headerbar {
+        background: var(--app-surface);
+        border-bottom: 1px solid var(--app-border);
+      }
+
+      .projects-progress-panel {
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        box-shadow: var(--app-shadow-soft);
+      }
+
+      .projects-progress-panel .card-body,
+      .projects-progress-panel .table-responsive {
+        background: var(--app-surface);
+      }
+
+      .projects-progress-panel .table {
+        margin-bottom: 0;
+        color: var(--app-text);
+        --bs-table-color: var(--app-text);
+        --bs-table-bg: var(--app-surface);
+        --bs-table-border-color: var(--app-border);
+        --bs-table-striped-bg: color-mix(in srgb, var(--app-surface-alt) 55%, transparent);
+        --bs-table-striped-color: var(--app-text);
+      }
+
+      .projects-progress-panel .table > :not(caption) > * > * {
+        background: var(--app-surface);
+        color: var(--app-text);
+        border-bottom-color: var(--app-border);
+      }
+
+      .projects-progress-panel .table > thead > tr > th {
+        background: var(--app-surface-alt);
+        color: var(--app-heading);
+      }
+
+      .projects-progress-control-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .lifecycle-progress {
+        background: var(--app-progress-track) !important;
+      }
+
+      .lifecycle-progress-fill {
+        background: var(--app-progress-fill) !important;
+      }
+    </style>
   </head>
-  <body class="dashboard-page">
+  <body class="dashboard-page projects-progress-page">
     <div class="sidebar sidebar-dark sidebar-fixed border-end" id="sidebar">
       <div class="sidebar-header border-bottom">
         <div class="sidebar-brand">
@@ -57,7 +114,7 @@
 
     <div class="wrapper d-flex flex-column min-vh-100">
       <header class="header header-sticky p-0 mb-4">
-        <div class="container-fluid border-bottom px-4">
+        <div class="container-fluid px-4 projects-progress-headerbar">
           <button class="header-toggler" type="button" onclick="coreui.Sidebar.getInstance(document.querySelector('#sidebar')).toggle()" style="margin-inline-start: -14px;">
             <svg class="icon icon-lg">
               <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-menu"></use>
@@ -81,19 +138,19 @@
               <div class="text-body-secondary small">Current phase: MP. The tags below still indicate which report types already have data.</div>
             </div>
             <div class="d-flex flex-column align-items-end gap-1">
-              <div class="small text-success fw-semibold">Current phase: MP</div>
+              <div class="small fw-semibold" style="color: var(--app-control-active-bg);">Current phase: MP</div>
               <div class="text-body-secondary small" id="projectProgressStatus">Idle</div>
             </div>
           </div>
 
-          <div class="d-flex flex-wrap gap-2 mb-3" aria-label="Product lifecycle stages">
-            <span class="badge rounded-pill bg-light text-muted px-3 py-2">EVT</span>
-            <span class="badge rounded-pill bg-light text-muted px-3 py-2">DVT</span>
-            <span class="badge rounded-pill bg-light text-muted px-3 py-2">PVT</span>
-            <span class="badge rounded-pill bg-success text-white px-3 py-2">MP</span>
+          <div class="projects-progress-control-group mb-3" aria-label="Product lifecycle stages">
+            <span class="app-control-pill">EVT</span>
+            <span class="app-control-pill">DVT</span>
+            <span class="app-control-pill">PVT</span>
+            <span class="app-control-pill is-active">MP</span>
           </div>
 
-          <div class="card">
+          <div class="card projects-progress-panel">
             <div class="card-body">
               <div class="table-responsive">
                 <table class="table align-middle mb-0">

@@ -9,6 +9,7 @@
     <link rel="shortcut icon" type="image/x-icon" href="assets/zay559/img/favicon.ico">
     <link rel="apple-touch-icon" href="assets/zay559/img/apple-icon.png">
 
+    <script src="js/config.js"></script>
     <link rel="stylesheet" href="assets/zay559/css/bootstrap.min.css">
     <link rel="stylesheet" href="assets/zay559/css/templatemo.css">
     <link rel="stylesheet" href="assets/zay559/css/custom.css">
@@ -22,6 +23,115 @@
     <style>
       .lb-card { border: 1px solid rgba(0, 0, 0, 0.06); }
       .navbar-nav { align-items: center; }
+      .home-page,
+      .home-page body {
+        background: var(--app-body-bg);
+        color: var(--app-text);
+      }
+      .home-page .navbar {
+        background: var(--app-nav-bg) !important;
+        border-bottom: 1px solid var(--app-border);
+      }
+      .home-page .navbar-brand,
+      .home-page .nav-link,
+      .home-page .dropdown-toggle,
+      .home-page .navbar-toggler {
+        color: var(--app-nav-text) !important;
+      }
+      .home-page .nav-link:hover,
+      .home-page .nav-link:focus,
+      .home-page .dropdown-toggle:hover,
+      .home-page .dropdown-toggle:focus {
+        color: var(--app-heading) !important;
+      }
+      .home-page .home-dashboard-link,
+      .home-page .home-dashboard-link .fa,
+      .home-page .home-dashboard-link span,
+      .home-page #homeHeroCarousel h1,
+      .home-page #homeHeroCarousel h2,
+      .home-page #homeHeroCarousel h3,
+      .home-page #homeHeroCarousel p {
+        color: var(--app-text) !important;
+      }
+      .home-page #homeHeroCarousel h1,
+      .home-page #homeHeroCarousel h2,
+      .home-page #homeHeroCarousel h3 {
+        color: var(--app-heading) !important;
+      }
+      .home-page .dropdown-menu,
+      .home-page .form-select,
+      .home-page .report-finder-filter,
+      .home-page #reportFinderForm button[type="submit"],
+      .home-page #reportFinderProjectToggle {
+        background: var(--app-control-bg) !important;
+        color: var(--app-control-text) !important;
+        border: 1px solid var(--app-control-border) !important;
+        box-shadow: var(--app-shadow-soft);
+      }
+      .home-page .dropdown-item {
+        color: var(--app-control-text) !important;
+      }
+      .home-page .dropdown-item:hover,
+      .home-page .dropdown-item:focus,
+      .home-page .dropdown-item.active,
+      .home-page .dropdown-item:active {
+        background: var(--app-control-hover-bg) !important;
+        color: var(--app-control-hover-text) !important;
+      }
+      .home-page #reportFinderForm button[type="submit"]:hover,
+      .home-page #reportFinderForm button[type="submit"]:active {
+        background: var(--app-control-active-bg) !important;
+        color: var(--app-control-active-text) !important;
+        border-color: var(--app-control-active-border) !important;
+        box-shadow: var(--app-motion-glow) !important;
+      }
+      .home-page .form-select:focus,
+      .home-page #reportFinderForm button[type="submit"]:focus,
+      .home-page #reportFinderProjectToggle:focus {
+        border-color: var(--app-control-active-border) !important;
+        box-shadow: 0 0 0 0.2rem var(--app-control-ring) !important;
+      }
+      .home-page .navbar-toggler-icon {
+        filter: invert(1) opacity(0.82);
+      }
+      [data-app-mode="light"] .home-page .navbar-toggler-icon {
+        filter: none;
+      }
+      .home-page #homeHeroCarousel .carousel-indicators li {
+        background: var(--app-control-bg);
+        border: 1px solid var(--app-control-border);
+        opacity: 1;
+      }
+      .home-page #homeHeroCarousel .carousel-indicators li.active {
+        background: var(--app-control-active-bg);
+        border-color: var(--app-control-active-border);
+        box-shadow: var(--app-motion-glow);
+      }
+      .home-page #homeHeroCarousel .carousel-control-prev,
+      .home-page #homeHeroCarousel .carousel-control-next {
+        color: var(--app-control-text) !important;
+        opacity: 1;
+      }
+      .home-page #homeHeroCarousel .carousel-control-prev i,
+      .home-page #homeHeroCarousel .carousel-control-next i {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 999px;
+        background: var(--app-control-bg);
+        border: 1px solid var(--app-control-border);
+        box-shadow: var(--app-shadow-soft);
+      }
+      .home-page #homeHeroCarousel .carousel-control-prev:hover i,
+      .home-page #homeHeroCarousel .carousel-control-next:hover i,
+      .home-page #homeHeroCarousel .carousel-control-prev:focus i,
+      .home-page #homeHeroCarousel .carousel-control-next:focus i {
+        background: var(--app-control-hover-bg);
+        border-color: var(--app-control-active-border);
+        box-shadow: var(--app-motion-glow);
+      }
 
       .report-card {
         border: 0;
@@ -71,22 +181,25 @@
       .report-card__meta { font-size: 0.78rem; color: var(--app-text-muted) !important; }
       .report-card__meta > div { line-height: 1.15; }
 
-      .scenario-tabs .nav-link {
-        border: 1px solid rgba(0, 0, 0, 0.12);
-        border-radius: 999px;
-        padding: 0.55rem 0.9rem;
-        color: var(--app-text);
-        background: var(--app-surface);
-        transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+      .scenario-tabs,
+      .lifecycle-filter-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
       }
-      .scenario-tabs .nav-link:hover {
-        border-color: color-mix(in srgb, var(--app-brand) 44%, transparent);
-        box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--app-brand) 14%, transparent);
+
+      .home-lifecycle-row {
+        background: var(--app-surface) !important;
+        border-color: var(--app-border) !important;
+        color: var(--app-text) !important;
       }
-      .scenario-tabs .nav-link.active {
-        background: var(--app-brand);
-        border-color: var(--app-brand);
-        color: var(--app-on-brand, #ffffff);
+
+      .home-lifecycle-progress {
+        background: var(--app-progress-track) !important;
+      }
+
+      .home-lifecycle-progress-fill {
+        background: var(--app-progress-fill) !important;
       }
 
       .leaderboard-title { color: var(--app-heading); }
@@ -178,7 +291,7 @@
   <body class="home-page">
     <nav class="navbar navbar-expand-lg navbar-light shadow-sm">
       <div class="container-fluid px-4 d-flex justify-content-between align-items-center">
-        <a class="navbar-brand text-success logo h1 align-self-center mb-0" href="index.html">Data Center</a>
+        <a class="navbar-brand logo h1 align-self-center mb-0" href="index.html">Data Center</a>
         <button
           class="navbar-toggler border-0"
           type="button"
@@ -319,17 +432,17 @@
         <div class="d-flex align-items-center justify-content-between mb-3">
           <h2 class="h2 mb-0">Product Lifecycle</h2>
           <div class="d-flex align-items-center gap-3">
-            <div class="small text-success fw-semibold">Current phase: MP</div>
+            <div class="small fw-semibold" style="color: var(--app-control-active-bg);">Current phase: MP</div>
             <div class="small text-muted" id="homeProjectProgressStatus">Idle</div>
             <a class="btn btn-sm btn-outline-secondary" href="projects-progress.html">View all</a>
           </div>
         </div>
-        <div class="lb-card rounded-3 p-3 bg-white">
-          <div class="d-flex flex-wrap gap-2 mb-3" id="homeLifecycleFilters" aria-label="Product lifecycle stages">
-            <button class="badge rounded-pill border-0 bg-light text-muted px-3 py-2" type="button" data-lifecycle-phase="EVT">EVT</button>
-            <button class="badge rounded-pill border-0 bg-light text-muted px-3 py-2" type="button" data-lifecycle-phase="DVT">DVT</button>
-            <button class="badge rounded-pill border-0 bg-light text-muted px-3 py-2" type="button" data-lifecycle-phase="PVT">PVT</button>
-            <button class="badge rounded-pill border-0 bg-success text-white px-3 py-2" type="button" data-lifecycle-phase="MP">MP</button>
+        <div class="lb-card rounded-3 p-3">
+          <div class="lifecycle-filter-group mb-3" id="homeLifecycleFilters" aria-label="Product lifecycle stages">
+            <button class="app-control-pill" type="button" data-lifecycle-phase="EVT">EVT</button>
+            <button class="app-control-pill" type="button" data-lifecycle-phase="DVT">DVT</button>
+            <button class="app-control-pill" type="button" data-lifecycle-phase="PVT">PVT</button>
+            <button class="app-control-pill is-active" type="button" data-lifecycle-phase="MP">MP</button>
           </div>
           <div class="small text-muted mb-2" id="homeLifecycleHint">Current lifecycle phase is MP. Tags below still show which report types already have data.</div>
           <div class="list-group" id="homeProjectProgressList"></div>
@@ -344,30 +457,18 @@
           <div class="small text-muted">By scenario</div>
         </div>
 
-        <ul class="nav nav-pills gap-2 mb-2 scenario-tabs" id="leaderboardScenarioTabs" role="tablist" aria-label="Leaderboard scenarios">
-          <li class="nav-item" role="presentation">
-            <button class="nav-link active" type="button" data-leaderboard-scenario="performance">Performance</button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" type="button" data-leaderboard-scenario="home">Home Environment</button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" type="button" data-leaderboard-scenario="interference">Interference</button>
-          </li>
-        </ul>
+        <div class="scenario-tabs mb-2" id="leaderboardScenarioTabs" role="tablist" aria-label="Leaderboard scenarios">
+          <button class="app-control-pill is-active" type="button" data-leaderboard-scenario="performance">Performance</button>
+          <button class="app-control-pill" type="button" data-leaderboard-scenario="home">Home Environment</button>
+          <button class="app-control-pill" type="button" data-leaderboard-scenario="interference">Interference</button>
+        </div>
         <div class="small text-muted mb-2" id="leaderboardScenarioHint"></div>
 
-        <ul class="nav nav-pills gap-2 mb-3 scenario-tabs" id="leaderboardDataTypeTabs" role="tablist" aria-label="Performance data types">
-          <li class="nav-item" role="presentation">
-            <button class="nav-link active" type="button" data-leaderboard-datatype="PEAK_THROUGHPUT">Peak Throughput</button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" type="button" data-leaderboard-datatype="RVR">RVR</button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" type="button" data-leaderboard-datatype="RVO">RVO</button>
-          </li>
-        </ul>
+        <div class="scenario-tabs mb-3" id="leaderboardDataTypeTabs" role="tablist" aria-label="Performance data types">
+          <button class="app-control-pill is-active" type="button" data-leaderboard-datatype="PEAK_THROUGHPUT">Peak Throughput</button>
+          <button class="app-control-pill" type="button" data-leaderboard-datatype="RVR">RVR</button>
+          <button class="app-control-pill" type="button" data-leaderboard-datatype="RVO">RVO</button>
+        </div>
 
         <div class="lb-card rounded-3 p-3">
           <div class="d-flex align-items-center justify-content-between mb-2">
@@ -401,16 +502,17 @@
           <div class="small text-muted">Find by ID or name</div>
         </div>
 
-        <div class="lb-card rounded-3 p-3 bg-white">
+        <div class="lb-card rounded-3 p-3">
           <form id="reportFinderForm" class="row g-2 align-items-center position-relative" autocomplete="off">
             <div class="col-12 col-md-auto" style="min-width: 210px;">
               <div class="dropdown w-100">
                 <input type="hidden" id="reportFinderProject" value="">
                 <button
-                  class="form-select text-start"
+                  class="form-select report-finder-filter text-start"
                   type="button"
                   id="reportFinderProjectToggle"
                   data-bs-toggle="dropdown"
+                  data-bs-display="static"
                   aria-expanded="false"
                 >Projects: All</button>
                 <ul
@@ -422,22 +524,22 @@
               </div>
             </div>
             <div class="col-12 col-md-auto" style="min-width: 160px;">
-              <select class="form-select" id="reportFinderReportType" aria-label="Report type filter">
+              <select class="form-select report-finder-filter" id="reportFinderReportType" aria-label="Report type filter">
                 <option value="">Type: All</option>
               </select>
             </div>
             <div class="col-12 col-md-auto" style="min-width: 160px;">
-              <select class="form-select" id="reportFinderBrand" aria-label="Brand filter">
+              <select class="form-select report-finder-filter" id="reportFinderBrand" aria-label="Brand filter">
                 <option value="">Brand: All</option>
               </select>
             </div>
             <div class="col-12 col-md-auto" style="min-width: 160px;">
-              <select class="form-select" id="reportFinderProductLine" aria-label="Product line filter">
+              <select class="form-select report-finder-filter" id="reportFinderProductLine" aria-label="Product line filter">
                 <option value="">Product Line: All</option>
               </select>
             </div>
             <div class="col-12 col-md-auto" style="min-width: 160px;">
-              <select class="form-select" id="reportFinderMainChip" aria-label="Main chip filter">
+              <select class="form-select report-finder-filter" id="reportFinderMainChip" aria-label="Main chip filter">
                 <option value="">Main Chip: All</option>
               </select>
             </div>
@@ -446,7 +548,7 @@
               <div class="list-group position-absolute start-0 top-100 w-100 mt-2 shadow-sm d-none" id="reportFinderResults" style="z-index: 10;"></div>
             </div>
             <div class="col-12 col-md-auto d-flex gap-2">
-              <button class="btn btn-success" type="submit">Search</button>
+              <button type="submit">Search</button>
               <button class="btn btn-outline-secondary" type="button" id="reportFinderReset">Reset</button>
             </div>
           </form>
@@ -485,5 +587,3 @@
     <script src="js/home-project-progress.js"></script>
   </body>
 </html>
-
-
