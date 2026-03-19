@@ -19,7 +19,8 @@
     spring: 'light',
     rainbow: 'light',
     midnight: 'dark',
-    sunshine: 'light'
+    sunshine: 'light',
+    corporate: 'dark'
   }
   const normalizeThemeSkin = value => (/^[a-z0-9-]+$/i.test(value || '') ? value : DEFAULT_THEME_SKIN)
   const normalizeThemeMode = value => (value === 'dark' ? 'dark' : 'light')
@@ -105,7 +106,14 @@
   document.documentElement.setAttribute('data-sidebar-mode', initialSidebarMode)
   document.documentElement.setAttribute('data-sidebar-ready', initialSidebarMode === 'minimal' ? 'false' : 'true')
   localStorage.setItem(THEME_SKIN_KEY, themeSkin)
-  document.documentElement.setAttribute('data-app-mode', getConfiguredThemeMode(themeSkin))
+  const initialMode = getConfiguredThemeMode(themeSkin)
+  document.documentElement.setAttribute('data-app-mode', initialMode)
+
+  if (themeSkin === 'corporate' && initialMode === 'dark') {
+    document.documentElement.style.setProperty('--app-body-bg', '#0f3285')
+    document.documentElement.style.setProperty('--app-nav-bg', '#0f3285')
+    document.documentElement.style.setProperty('--app-sidebar-bg', '#0f3285')
+  }
   ensureStylesheet('assets/css/theme.css')
   ensureScript('js/theme-palette-config.js', () => {
     document.documentElement.setAttribute('data-app-mode', getConfiguredThemeMode(themeSkin))

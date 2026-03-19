@@ -1,5 +1,5 @@
 ﻿window.APP_THEME_CONFIG = {
-  defaultTheme: 'daylight',
+  defaultTheme: 'corporate',
   themes: {
     daylight: {
       label: 'Light',
@@ -42,6 +42,12 @@
       description: 'Configured from Coolors URL',
       mode: 'light',
       paletteUrl: 'https://coolors.co/palette/fffae5-fff6cc-fff2b2-ffee99-ffe97f-ffe566-ffe14c-ffdd32-ffd819-ffd400'
+    },
+    corporate: {
+      label: 'Default',
+      description: 'Default palette based on #0f3285',
+      mode: 'dark',
+      paletteUrl: 'https://coolors.co/palette/041539-062055-092d77-0f3285-0c3da1-104ed1-3874f0-7aa2f5-d9e4fc'
     },
   }
 }

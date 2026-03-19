@@ -24,6 +24,12 @@
         description: 'Blue data-center palette',
         mode: 'dark',
         paletteUrl: 'https://coolors.co/palette/03045e-023e8a-0077b6-0096c7-00b4d8-48cae4-90e0ef-ade8f4-caf0f8'
+      },
+      corporate: {
+        label: 'Corporate',
+        description: 'Corporate palette based on #0a3285',
+        mode: 'light',
+        paletteUrl: 'https://coolors.co/palette/041539-062055-092d77-0a3285-0c3da1-104ed1-3874f0-7aa2f5-d9e4fc'
       }
     }
   }
@@ -452,6 +458,93 @@
     const colors = parseCoolorsPaletteUrl(theme.paletteUrl)
     const mode = normalizeThemeMode(forcedMode) || normalizeThemeMode(theme.mode) || getCurrentColorMode()
     const tokens = buildThemeTokens(colors, mode)
+
+    const defaultThemeKey = getDefaultTheme()
+    if (key === defaultThemeKey && mode === 'dark') {
+      const base = '#0f3285'
+      const container = base
+      const surface = '#13264a'
+      const surfaceAlt = '#172d56'
+      const panel = '#1a3361'
+      const panelStrong = '#213c6f'
+      const accent = '#2dd4bf'
+      const support = '#f59e0b'
+      const ink = '#ffffff'
+      const mutedInk = 'rgba(255, 255, 255, 0.76)'
+      const border = 'rgba(255, 255, 255, 0.14)'
+      const borderStrong = 'rgba(255, 255, 255, 0.24)'
+      Object.assign(tokens, {
+        '--app-theme-name': 'Default',
+        '--app-body-bg': `radial-gradient(1100px circle at 20% 55%, ${toRgba('#ffffff', 0.1)} 0%, ${toRgba('#ffffff', 0)} 62%), radial-gradient(900px circle at 80% 65%, ${toRgba(accent, 0.18)} 0%, ${toRgba(accent, 0)} 60%), linear-gradient(180deg, ${container} 0%, ${container} 55%, ${mix(container, '#ffffff', 0.12)} 100%)`,
+        '--app-body-bg-rgb': toRgbChannels(container),
+        '--app-text': ink,
+        '--app-mode-text': ink,
+        '--app-text-muted': mutedInk,
+        '--app-heading': ink,
+        '--app-border': border,
+        '--app-border-strong': borderStrong,
+        '--app-shadow': `0 24px 48px -28px ${toRgba('#000000', 0.72)}`,
+        '--app-shadow-soft': `0 16px 32px -24px ${toRgba('#000000', 0.56)}`,
+        '--app-nav-bg': container,
+        '--app-nav-text': ink,
+        '--app-nav-hover': mix(container, '#ffffff', 0.64),
+        '--app-hero-start': mix(container, '#000000', 0.1),
+        '--app-hero-end': mix(container, '#000000', 0.22),
+        '--app-hero-text': ink,
+        '--app-hero-muted': 'rgba(255, 255, 255, 0.74)',
+        '--app-sidebar-bg': container,
+        '--app-sidebar-surface': container,
+        '--app-sidebar-text': 'rgba(255, 255, 255, 0.92)',
+        '--app-sidebar-muted': 'rgba(255, 255, 255, 0.72)',
+        '--app-sidebar-hover': toRgba('#ffffff', 0.12),
+        '--app-sidebar-active': `linear-gradient(135deg, ${mix(container, '#000000', 0.08)}, ${mix(container, '#ffffff', 0.08)})`,
+
+        '--app-surface': surface,
+        '--app-surface-alt': surfaceAlt,
+        '--app-surface-glass': toRgba(surface, 0.9),
+        '--app-panel': panel,
+        '--app-panel-strong': panelStrong,
+        '--app-muted-surface': toRgba('#ffffff', 0.08),
+
+        '--app-control-bg': toRgba('#ffffff', 0.12),
+        '--app-control-hover-bg': toRgba('#ffffff', 0.16),
+        '--app-control-active-bg': toRgba('#ffffff', 0.22),
+        '--app-control-border': toRgba('#ffffff', 0.22),
+        '--app-control-active-border': toRgba('#ffffff', 0.32),
+        '--app-control-text': ink,
+        '--app-control-hover-text': ink,
+        '--app-control-active-text': ink,
+        '--app-control-ring': toRgba(accent, 0.22),
+        '--app-control-disabled-bg': toRgba('#ffffff', 0.06),
+        '--app-control-disabled-text': 'rgba(255, 255, 255, 0.56)',
+        '--app-control-disabled-border': toRgba('#ffffff', 0.14),
+
+        '--app-chip-bg': toRgba('#ffffff', 0.12),
+        '--app-chip-active-bg': toRgba('#ffffff', 0.2),
+        '--app-progress-track': toRgba('#ffffff', 0.12),
+        '--app-progress-fill': accent,
+        '--app-motion-glow': `0 0 0 0.18rem ${toRgba(accent, 0.18)}`,
+
+        '--app-brand': container,
+        '--app-brand-strong': ink,
+        '--app-on-brand': ink,
+        '--app-brand-soft': toRgba(container, 0.22),
+        '--app-accent': accent,
+        '--app-accent-soft': toRgba(accent, 0.2),
+        '--app-success': '#34d399',
+        '--app-warning': support,
+        '--app-danger': '#fb7185',
+        '--app-info': accent,
+        '--app-rank-bg': toRgba(accent, 0.16),
+        '--app-chart-1': accent,
+        '--app-chart-2': support,
+        '--app-chart-3': '#60a5fa',
+        '--app-chart-4': '#34d399',
+
+        '--cui-primary': accent,
+        '--cui-primary-rgb': toRgbChannels(accent)
+      })
+    }
     const swatch = colors.length > 1
       ? `linear-gradient(135deg, ${colors[0]}, ${colors[colors.length - 1]})`
       : colors[0] || '#0f172a'

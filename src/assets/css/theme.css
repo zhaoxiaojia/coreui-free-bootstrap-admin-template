@@ -233,13 +233,13 @@ body {
 
 body.dashboard-page .sidebar {
   background: var(--app-sidebar-bg);
-  border-color: var(--app-border) !important;
+  border: none !important;
 }
 
 body.dashboard-page .sidebar-header,
 body.dashboard-page .sidebar-footer {
   background: var(--app-sidebar-surface);
-  border-color: var(--app-border) !important;
+  border: none !important;
 }
 
 body.dashboard-page .sidebar .nav-link,
@@ -262,16 +262,16 @@ body.dashboard-page .footer {
 }
 
 body.dashboard-page .header {
-  border-bottom: 1px solid var(--app-border);
+  border: none !important;
 }
 
 body.dashboard-page .footer {
-  border-top: 1px solid var(--app-border);
+  border: none !important;
 }
 
 body.dashboard-page .header .container-fluid {
   background: var(--app-nav-bg);
-  border-color: var(--app-border) !important;
+  border: none !important;
 }
 
 body.dashboard-page .header .nav-link,

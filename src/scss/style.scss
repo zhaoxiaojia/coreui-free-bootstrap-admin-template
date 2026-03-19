@@ -1,10 +1,13 @@
 @use "@coreui/coreui/scss/coreui" as * with (
-  $enable-deprecation-messages: false
+  $enable-deprecation-messages: false,
+  $primary: #0f3285,
+  $link-color: #0f3285,
+  $component-active-bg: #0f3285
 );
 @use "vendors/simplebar";
 
 body {
-  background-color: var(--cui-tertiary-bg);
+  background: var(--app-body-bg);
 }
 
 .wrapper {

@@ -2,6 +2,29 @@ body.dashboard-page {
   background: var(--app-body-bg);
 }
 
+body.dashboard-page .sidebar,
+body.dashboard-page .sidebar-header,
+body.dashboard-page .sidebar-footer {
+  background: var(--app-sidebar-bg) !important;
+  border: none !important;
+}
+
+body.dashboard-page .header,
+body.dashboard-page .footer,
+body.dashboard-page .header .container-fluid {
+  background: var(--app-nav-bg) !important;
+  border: none !important;
+}
+
+body.dashboard-page .sidebar-toggler {
+  --cui-sidebar-toggler-width: 1.25rem;
+  --cui-sidebar-toggler-height: 1.25rem;
+  --cui-sidebar-toggler-color: rgba(255, 255, 255, 0.88);
+  --cui-sidebar-toggler-hover-color: rgba(255, 255, 255, 1);
+  --cui-sidebar-toggler-focus-color: rgba(255, 255, 255, 1);
+  --cui-sidebar-toggler-bg: rgba(255, 255, 255, 0.08);
+}
+
 body.dashboard-page .wrapper {
   background: transparent;
 }
