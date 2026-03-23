@@ -22,6 +22,10 @@ body {
   min-height: 120px;
 }
 
+.header > .container-fluid {
+  flex-wrap: nowrap;
+}
+
 .sidebar-brand-full {
   margin-left: 3px;
 }

@@ -44,9 +44,6 @@
       .home-page .dropdown-toggle:focus {
         color: var(--app-heading) !important;
       }
-      .home-page .home-dashboard-link,
-      .home-page .home-dashboard-link .fa,
-      .home-page .home-dashboard-link span,
       .home-page #homeHeroCarousel h1,
       .home-page #homeHeroCarousel h2,
       .home-page #homeHeroCarousel h3,
@@ -307,6 +304,9 @@
         <div class="align-self-center collapse navbar-collapse flex-fill d-lg-flex justify-content-lg-between" id="main_nav">
           <div class="flex-fill">
             <ul class="navbar-nav mx-lg-auto gap-2 gap-lg-3">
+              <li class="nav-item">
+                <a class="nav-link" href="wifi-dashboard.html">Dashboard</a>
+              </li>
               <li class="nav-item dropdown">
                 <a
                   class="nav-link dropdown-toggle"
@@ -344,12 +344,7 @@
             </ul>
           </div>
 
-          <div class="navbar align-self-center d-flex ms-lg-auto">
-            <a class="nav-icon position-relative text-decoration-none home-dashboard-link" href="wifi-dashboard.html" title="Dashboard">
-              <i class="fa fa-fw fa-chart-line"></i>
-              <span class="ms-1 d-none d-lg-inline">Dashboard</span>
-            </a>
-          </div>
+          <div class="navbar align-self-center d-flex ms-lg-auto"></div>
         </div>
       </div>
     </nav>
@@ -574,8 +569,8 @@
       </div>
     </section>
 
-    <footer class="bg-dark py-4">
-      <div class="container text-light">
+    <footer class="py-4">
+      <div class="container">
       </div>
     </footer>
 

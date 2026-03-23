@@ -82,8 +82,11 @@
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') return ''
     if (!port) return ''
 
-    const portsWithApi = new Set(['3000', '5000'])
-    if (portsWithApi.has(port)) return ''
+    if (port === '5000') return ''
+
+    if (port === '3000') {
+      return `${window.location.protocol}//${hostname}:5000/api`
+    }
 
     return `${window.location.protocol}//${hostname}:5000/api`
   }
@@ -106,7 +109,8 @@
   document.documentElement.setAttribute('data-sidebar-mode', initialSidebarMode)
   document.documentElement.setAttribute('data-sidebar-ready', initialSidebarMode === 'minimal' ? 'false' : 'true')
   localStorage.setItem(THEME_SKIN_KEY, themeSkin)
-  const initialMode = getConfiguredThemeMode(themeSkin)
+  const initialMode = 'light'
+  localStorage.setItem(MODE_KEY, initialMode)
   document.documentElement.setAttribute('data-app-mode', initialMode)
 
   if (themeSkin === 'corporate' && initialMode === 'dark') {
@@ -149,6 +153,7 @@
     return item
   }
 
+
   const applyMinimalSidebar = () => {
     if (getSidebarMode() !== 'minimal') {
       document.documentElement.setAttribute('data-sidebar-ready', 'true')
@@ -161,13 +166,7 @@
       return
     }
 
-    const homeItem =
-      sidebarNav.querySelector('a.nav-link[href="index.html"]')?.closest('li') ??
-      ensureNavItem({
-        href: 'index.html',
-        icon: 'node_modules/@coreui/icons/sprites/free.svg#cil-home',
-        label: 'Home'
-      }, sidebarNav)
+    const homeItem = sidebarNav.querySelector('a.nav-link[href="index.html"]')?.closest('li') ?? null
 
     const wifiDashboardGroup =
       Array.from(sidebarNav.querySelectorAll('li.nav-group')).find(item => {
@@ -191,7 +190,6 @@
     const items = Array.from(sidebarNav.children)
     items.forEach(item => {
       const shouldShow =
-        item === homeItem ||
         (wifiDashboardGroup ? item === wifiDashboardGroup : false) ||
         (dashboardItem ? item === dashboardItem : false)
 

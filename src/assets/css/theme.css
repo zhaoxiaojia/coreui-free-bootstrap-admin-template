@@ -292,6 +292,75 @@ body.dashboard-page .footer a:hover {
   color: var(--app-heading) !important;
 }
 
+:root[data-theme-skin='corporate'] .dropdown-menu {
+  background: var(--app-interactive, var(--app-control-bg)) !important;
+  color: var(--app-on-interactive, var(--app-control-text)) !important;
+  border-color: var(--app-dropdown-border, var(--app-control-border)) !important;
+  box-shadow: var(--app-shadow-soft);
+}
+
+:root[data-theme-skin='corporate'] .dropdown-item {
+  color: var(--app-on-interactive, var(--app-control-text)) !important;
+}
+
+:root[data-theme-skin='corporate'] .dropdown-item:hover,
+:root[data-theme-skin='corporate'] .dropdown-item:focus,
+:root[data-theme-skin='corporate'] .dropdown-item.active,
+:root[data-theme-skin='corporate'] .dropdown-item:active {
+  background: var(--app-interactive-hover, var(--app-control-hover-bg)) !important;
+  color: var(--app-on-interactive, var(--app-control-hover-text)) !important;
+}
+
+:root[data-theme-skin='corporate'] .multi-select__dropdown {
+  background: var(--app-interactive, var(--app-control-bg));
+  color: var(--app-on-interactive, var(--app-control-text));
+  border: 1px solid var(--app-dropdown-border, var(--app-control-border));
+}
+
+:root[data-theme-skin='corporate'] .multi-select__search,
+:root[data-theme-skin='corporate'] .multi-select__actions {
+  background: var(--app-interactive, var(--app-control-bg));
+}
+
+:root[data-theme-skin='corporate'] .multi-select__search {
+  border-bottom: 1px solid var(--app-dropdown-border, var(--app-control-border)) !important;
+}
+
+:root[data-theme-skin='corporate'] .multi-select__actions {
+  border-top: 1px solid var(--app-dropdown-border, var(--app-control-border)) !important;
+}
+
+:root[data-theme-skin='corporate'] .multi-select__option:hover {
+  background-color: var(--app-interactive-hover, var(--app-control-hover-bg));
+}
+
+:root[data-theme-skin='corporate'] .multi-select__option .form-check-label,
+:root[data-theme-skin='corporate'] .multi-select__empty {
+  color: var(--app-on-interactive, var(--app-control-text));
+}
+
+:root[data-theme-skin='corporate'] .multi-select__actions .btn {
+  background: color-mix(in srgb, var(--app-interactive, var(--app-control-bg)) 92%, black 8%);
+  color: var(--app-on-interactive, var(--app-control-text));
+  border-color: var(--app-dropdown-border, var(--app-control-border));
+}
+
+:root[data-theme-skin='corporate'] .multi-select__actions .btn:hover {
+  background: var(--app-interactive-hover, var(--app-control-hover-bg));
+}
+
+:root[data-app-mode='dark'] .multi-select__option .form-check-label {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+:root[data-app-mode='dark'] .multi-select__option .form-check-input:checked + .form-check-label {
+  color: #ffffff;
+}
+
+:root[data-app-mode='dark'] .multi-select__tag.badge {
+  color: #ffffff !important;
+}
+
 body.dashboard-page .header .vr {
   color: var(--app-border-strong) !important;
 }

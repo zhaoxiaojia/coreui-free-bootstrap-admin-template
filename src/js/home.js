@@ -5,16 +5,13 @@
     const hostname = window.location.hostname
     const port = window.location.port
 
-    if (hostname !== 'localhost' && hostname !== '127.0.0.1') return ''
-    if (!port) return ''
-
-    const portsWithApi = new Set(['3000', '5000'])
-    if (portsWithApi.has(port)) return ''
-
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') return null
+    if (!port) return null
+    if (port === '5000') return null
     return `${window.location.protocol}//${hostname}:5000/api`
   }
 
-  const API_BASE = window.WIFI_API_BASE ?? window.WIFI_DASHBOARD_API_BASE ?? inferLocalApiBase() ?? DEFAULT_API_BASE
+  const API_BASE = window.WIFI_API_BASE || window.WIFI_DASHBOARD_API_BASE || inferLocalApiBase() || DEFAULT_API_BASE
 
   const elements = {
     projectsGrid: document.getElementById('projectsGrid'),
