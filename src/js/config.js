@@ -6,6 +6,8 @@
  */
 
 (() => {
+  const debug = (...args) => console.info('[wifi-config]', ...args)
+  const warn = (...args) => console.warn('[wifi-config]', ...args)
   const THEME_SKIN_KEY = 'coreui-free-bootstrap-admin-template-theme-skin'
   const MODE_KEY = 'coreui-free-bootstrap-admin-template-app-mode'
   const urlParams = new URLSearchParams(window.location.href.split('?')[1])
@@ -155,14 +157,20 @@
 
 
   const applyMinimalSidebar = () => {
+    debug('applyMinimalSidebar:start', {
+      sidebarMode: getSidebarMode(),
+      path: window.location.pathname
+    })
     if (getSidebarMode() !== 'minimal') {
       document.documentElement.setAttribute('data-sidebar-ready', 'true')
+      debug('applyMinimalSidebar:skip_non_minimal')
       return
     }
 
     const sidebarNav = document.querySelector('#sidebar ul.sidebar-nav')
     if (!sidebarNav) {
       document.documentElement.setAttribute('data-sidebar-ready', 'true')
+      warn('applyMinimalSidebar:no_sidebar_nav')
       return
     }
 
@@ -196,7 +204,102 @@
       item.style.display = shouldShow ? '' : 'none'
     })
     document.documentElement.setAttribute('data-sidebar-ready', 'true')
+    debug('applyMinimalSidebar:done', {
+      totalItems: items.length,
+      wifiDashboardGroupFound: Boolean(wifiDashboardGroup),
+      dashboardItemFound: Boolean(dashboardItem)
+    })
   }
 
-  document.addEventListener('DOMContentLoaded', applyMinimalSidebar)
+  const syncWifiSidebarState = () => {
+    const sidebarNav = document.querySelector('#sidebar ul.sidebar-nav')
+    if (!sidebarNav) {
+      warn('syncWifiSidebarState:no_sidebar_nav')
+      return
+    }
+
+    const currentUrl = new URL(window.location.href)
+    const currentPath = currentUrl.pathname.split('/').pop() || 'index.html'
+    const currentDatatype = (currentUrl.searchParams.get('datatype') || '').trim().toUpperCase()
+    const parentLink = sidebarNav.querySelector('a.nav-link[href="wifi-dashboard.html"]')
+    const childLinks = Array.from(sidebarNav.querySelectorAll('.nav-group-items .nav-link'))
+
+    childLinks.forEach(link => {
+      link.classList.remove('active')
+      link.removeAttribute('aria-current')
+    })
+
+    if (parentLink) {
+      parentLink.classList.remove('active', 'is-section-active')
+      parentLink.removeAttribute('aria-current')
+    }
+
+    const childMatches = childLinks.map(link => ({
+      href: (link.getAttribute('href') || '').trim(),
+      text: (link.textContent || '').trim()
+    }))
+
+    const activeChild = childLinks.find(link => {
+      const href = (link.getAttribute('href') || '').trim()
+      if (!href) return false
+
+      if (href.startsWith('wifi-dashboard.html?datatype=')) {
+        if (currentPath !== 'wifi-dashboard.html' || !currentDatatype) return false
+        const linkUrl = new URL(href, currentUrl.origin)
+        return (linkUrl.searchParams.get('datatype') || '').trim().toUpperCase() === currentDatatype
+      }
+
+      return href === currentPath
+    })
+
+    if (activeChild) {
+      activeChild.classList.add('active')
+      activeChild.setAttribute('aria-current', 'page')
+    }
+
+    if (parentLink && activeChild) {
+      parentLink.classList.add('active', 'is-section-active')
+      parentLink.setAttribute('aria-current', 'page')
+    }
+
+    debug('syncWifiSidebarState:resolved', {
+      currentPath,
+      currentDatatype,
+      activeChildHref: activeChild?.getAttribute('href') ?? null,
+      activeChildText: activeChild?.textContent?.trim?.() ?? null,
+      parentLinkFound: Boolean(parentLink),
+      childMatches
+    })
+  }
+
+  const debugHeaderLayout = () => {
+    const header = document.querySelector('body.dashboard-page .header')
+    if (!header) {
+      warn('debugHeaderLayout:no_header')
+      return
+    }
+
+    const headerRows = Array.from(header.children).map((node, index) => ({
+      index,
+      tag: node.tagName,
+      className: node.className,
+      childCount: node.children.length,
+      text: (node.textContent || '').trim().slice(0, 120)
+    }))
+
+    debug('debugHeaderLayout:rows', {
+      count: header.children.length,
+      rows: headerRows
+    })
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    debug('DOMContentLoaded', {
+      href: window.location.href,
+      apiBase: window.WIFI_DASHBOARD_API_BASE ?? null
+    })
+    applyMinimalSidebar()
+    syncWifiSidebarState()
+    debugHeaderLayout()
+  })
 })()

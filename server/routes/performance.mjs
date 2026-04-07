@@ -1,8 +1,10 @@
 import { Router } from 'express'
 import pool from '../db.mjs'
 import { allowedDeviceOptions, buildPerformanceConditions, normalizeFilters } from '../utils/filter-utils.mjs'
+import { createLogger } from '../utils/logger.mjs'
 
 const router = Router()
+const logger = createLogger({ name: 'api.performance' })
 
 const isValidDate = value => value instanceof Date && !Number.isNaN(value.getTime())
 
@@ -11,6 +13,23 @@ const MAX_LIMIT = Number.parseInt(process.env.API_MAX_LIMIT ?? '5000', 10)
 
 router.get('/', async (req, res, next) => {
   const filters = normalizeFilters(req.query)
+  logger.info('performance_request_received', {
+    rawQuery: req.query ?? {},
+    normalizedFilters: {
+      productLine: filters.productLine,
+      productLines: filters.productLines,
+      project: filters.project,
+      projects: filters.projects,
+      testReportCsvName: filters.testReportCsvName,
+      testReportCsvNames: filters.testReportCsvNames,
+      standard: filters.standard,
+      standards: filters.standards,
+      dataType: filters.dataType,
+      limit: filters.limit ?? null,
+      startDate: filters.startDate?.toISOString?.() ?? null,
+      endDate: filters.endDate?.toISOString?.() ?? null
+    }
+  })
 
   if (filters.deviceValue && !filters.deviceColumn) {
     return res.status(400).json({
@@ -97,7 +116,25 @@ router.get('/', async (req, res, next) => {
         params.push(limitForQuery)
       }
 
+      logger.info('performance_query_built', {
+        conditions: performanceFilter.conditions,
+        params,
+        appliedLimit,
+        limitForQuery
+      })
+
       const [rows] = await connection.query(query, params)
+      logger.info('performance_query_rows', {
+        rowCount: rows.length,
+        sample: rows.slice(0, 3).map(row => ({
+          project_name: row.project_name,
+          report_type: row.report_type,
+          wifi_mode: row.wifi_mode,
+          attenuation: row.attenuation,
+          throughput_avg_mbps: row.throughput_avg_mbps,
+          created_at: row.created_at
+        }))
+      })
 
       let truncated = false
       let effectiveRows = rows
@@ -219,9 +256,15 @@ router.get('/', async (req, res, next) => {
         }
       })
     } finally {
+      logger.info('performance_connection_release', {})
       connection.release()
     }
   } catch (error) {
+    logger.error('performance_request_failed', {
+      message: error?.message ?? String(error),
+      code: error?.code ?? null,
+      sqlState: error?.sqlState ?? null
+    })
     next(error)
   }
 })

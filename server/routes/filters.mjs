@@ -5,16 +5,36 @@ import {
   buildTestReportConditions,
   normalizeFilters
 } from '../utils/filter-utils.mjs'
+import { createLogger } from '../utils/logger.mjs'
 
 const router = Router()
+const logger = createLogger({ name: 'api.filters' })
 
 router.get('/', async (req, res, next) => {
   const filters = normalizeFilters(req.query)
   const testReportLimit = Math.min(Math.max(Number.parseInt(req.query.test_report_limit ?? '200', 10) || 200, 10), 1000)
+  logger.info('filters_request_received', {
+    rawQuery: req.query ?? {},
+    normalizedFilters: {
+      productLine: filters.productLine,
+      productLines: filters.productLines,
+      project: filters.project,
+      projects: filters.projects,
+      testReportCsvName: filters.testReportCsvName,
+      testReportCsvNames: filters.testReportCsvNames,
+      standard: filters.standard,
+      standards: filters.standards,
+      dataType: filters.dataType,
+      startDate: filters.startDate?.toISOString?.() ?? null,
+      endDate: filters.endDate?.toISOString?.() ?? null
+    },
+    testReportLimit
+  })
 
   try {
     const connection = await pool.getConnection()
     try {
+      logger.info('filters_connection_acquired', {})
       const [productLines] = await connection.query(
         'SELECT DISTINCT project_type FROM project WHERE project_type IS NOT NULL ORDER BY project_type'
       )
@@ -39,8 +59,12 @@ router.get('/', async (req, res, next) => {
         'SELECT DISTINCT ecosystem AS value FROM project WHERE ecosystem IS NOT NULL ORDER BY ecosystem'
       )
 
-      const [massProductionStatuses] = await connection.query('SELECT NULL AS value WHERE 1 = 0')
-      const [dutConnectTypes] = await connection.query('SELECT NULL AS value WHERE 1 = 0')
+      const [reportTypes] = await connection.query(`
+        SELECT COALESCE(NULLIF(TRIM(report_type), ''), '__NULL__') AS report_type, COUNT(*) AS count
+        FROM test_report
+        GROUP BY COALESCE(NULLIF(TRIM(report_type), ''), '__NULL__')
+        ORDER BY count DESC, report_type ASC
+      `)
 
       const projectFilter = buildTestReportConditions(filters, { exclude: ['project'] })
       const projectJoinPerf = projectFilter.requiresPerformanceJoin
@@ -59,6 +83,11 @@ router.get('/', async (req, res, next) => {
         projectQuery += ` AND ${projectFilter.conditions.join(' AND ')}`
       }
       projectQuery += ' ORDER BY pr.project_name'
+      logger.info('filters_project_query', {
+        conditions: projectFilter.conditions,
+        params: projectFilter.params,
+        requiresPerformanceJoin: projectFilter.requiresPerformanceJoin
+      })
       const [projects] = await connection.query(projectQuery, projectFilter.params)
 
       const standardFilter = buildPerformanceConditions(filters, { exclude: ['standard'], includeBase: false })
@@ -74,6 +103,10 @@ router.get('/', async (req, res, next) => {
         standardQuery += ` AND ${standardFilter.conditions.join(' AND ')}`
       }
       standardQuery += ' ORDER BY p.wifi_mode'
+      logger.info('filters_standard_query', {
+        conditions: standardFilter.conditions,
+        params: standardFilter.params
+      })
       const [standards] = await connection.query(standardQuery, standardFilter.params)
 
       const testReportFilter = buildTestReportConditions(filters, { exclude: ['testReport'] })
@@ -101,6 +134,11 @@ router.get('/', async (req, res, next) => {
         ) t
         ORDER BY t.value
       `
+      logger.info('filters_test_report_query', {
+        conditions: testReportFilter.conditions,
+        params: [...testReportFilter.params, testReportLimit],
+        requiresPerformanceJoin: testReportFilter.requiresPerformanceJoin
+      })
       const [testReports] = await connection.query(testReportQuery, [...testReportFilter.params, testReportLimit])
 
       let reportNameQuery = `
@@ -125,13 +163,36 @@ router.get('/', async (req, res, next) => {
       `
       const [reportNames] = await connection.query(reportNameQuery, [...testReportFilter.params, testReportLimit])
 
+      logger.info('filters_query_result_counts', {
+        productLines: productLines.length,
+        wifiModules: wifiModules.length,
+        interfaces: interfaces.length,
+        brands: brands.length,
+        mainChips: mainChips.length,
+        ecosystems: ecosystems.length,
+        projects: projects.length,
+        standards: standards.length,
+        testReports: testReports.length,
+        reportNames: reportNames.length,
+        sample: {
+          productLines: productLines.slice(0, 5).map(row => row.project_type),
+          projects: projects.slice(0, 5).map(row => row.value),
+          standards: standards.slice(0, 5).map(row => row.value),
+          testReports: testReports.slice(0, 5).map(row => row.value)
+        },
+        reportTypes: reportTypes.map(row => ({
+          report_type: row.report_type,
+          count: Number(row.count)
+        }))
+      })
+
       res.json({
         productLines: productLines.map(row => row.project_type),
         brands: brands.map(row => row.value),
         mainChips: mainChips.map(row => row.value),
         ecosystems: ecosystems.map(row => row.value),
-        massProductionStatuses: massProductionStatuses.map(row => row.value).filter(Boolean),
-        dutConnectTypes: dutConnectTypes.map(row => row.value).filter(Boolean),
+        massProductionStatuses: [],
+        dutConnectTypes: [],
         wifiModules: wifiModules.map(row => row.value),
         interfaces: interfaces.map(row => row.value),
         projects: projects.map(row => row.value),
@@ -144,9 +205,15 @@ router.get('/', async (req, res, next) => {
         reportNames: reportNames.map(row => row.value)
       })
     } finally {
+      logger.info('filters_connection_release', {})
       connection.release()
     }
   } catch (error) {
+    logger.error('filters_request_failed', {
+      message: error?.message ?? String(error),
+      code: error?.code ?? null,
+      sqlState: error?.sqlState ?? null
+    })
     next(error)
   }
 })

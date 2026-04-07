@@ -9,6 +9,8 @@
  */
 
 (() => {
+  const debug = (...args) => console.info('[wifi-dashboard]', ...args)
+  const warn = (...args) => console.warn('[wifi-dashboard]', ...args)
   const DEFAULT_API_BASE = new URL('/api', window.location.origin).toString()
   const API_BASE = window.WIFI_DASHBOARD_API_BASE ?? DEFAULT_API_BASE
   const DEFAULT_LIMIT = Number.parseInt(window.WIFI_DASHBOARD_MAX_POINTS ?? '1000', 10)
@@ -69,6 +71,7 @@
 
   const syncSidebarDataTypeLinks = () => {
     const sidebarLinks = document.querySelectorAll(".sidebar .nav-group-items .nav-link[href*='wifi-dashboard.html?datatype=']")
+    let hasActiveChild = false
     sidebarLinks.forEach(link => {
       let linkType = null
       try {
@@ -81,10 +84,43 @@
       const isActive = Boolean(linkType) && linkType === selectedDataType
       link.classList.toggle('active', isActive)
       if (isActive) {
+        hasActiveChild = true
         link.setAttribute('aria-current', 'page')
       } else {
         link.removeAttribute('aria-current')
       }
+    })
+
+    const sectionLink = document.querySelector(".sidebar .nav-group.show > .nav-link[href='wifi-dashboard.html']")
+    if (sectionLink) {
+      sectionLink.classList.toggle('active', hasActiveChild)
+      sectionLink.classList.toggle('is-section-active', hasActiveChild)
+      if (hasActiveChild) {
+        sectionLink.setAttribute('aria-current', 'page')
+      } else {
+        sectionLink.removeAttribute('aria-current')
+      }
+    }
+
+    debug('syncSidebarDataTypeLinks', {
+      selectedDataType,
+      activeSection: hasActiveChild,
+      links: Array.from(sidebarLinks).map(link => ({
+        href: link.getAttribute('href'),
+        text: (link.textContent || '').trim(),
+        active: link.classList.contains('active')
+      }))
+    })
+  }
+
+  const syncSelectedDataTypeToUrl = () => {
+    const url = new URL(window.location.href)
+    url.pathname = `${url.pathname.replace(/\/[^/]*$/, '')}/wifi-dashboard.html`
+    url.searchParams.set('datatype', selectedDataType)
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+    debug('syncSelectedDataTypeToUrl', {
+      selectedDataType,
+      href: window.location.href
     })
   }
 
@@ -106,11 +142,14 @@
   }
 
   const fetchJson = async url => {
+    debug('fetchJson:start', { url })
     const response = await fetch(url)
     if (!response.ok) {
       const error = new Error(`Request failed (${response.status})`)
+      warn('fetchJson:failed', { url, status: response.status })
       throw error
     }
+    debug('fetchJson:ok', { url, status: response.status })
     return response.json()
   }
 
@@ -1164,16 +1203,19 @@
     })
 
   const collectFilters = () => {
-    return {
+    const apiDataType = selectedDataType === 'PEAK_THROUGHPUT' ? 'performance' : selectedDataType
+    const collected = {
       product_line: getSelectedValues(productLineSelect),
       project: getSelectedValues(projectSelect),
       report_name: testReportSelect ? getSelectedValues(testReportSelect) : [],
       standard: getSelectedValues(standardSelect),
-      data_type: selectedDataType,
+      data_type: apiDataType,
       start_date: startDateInput.value || '',
       end_date: endDateInput.value || '',
       limit: DEFAULT_LIMIT
     }
+    debug('collectFilters', collected)
+    return collected
   }
 
   const saveFilterState = () => {
@@ -1339,24 +1381,65 @@
   const fetchFilters = async () => {
     const filters = collectFilters()
     const queryString = buildQueryString(filters)
-    const endpoint = queryString ? `${API_BASE}/filters?${queryString}` : `${API_BASE}/filters`
-    const response = await fetch(endpoint)
-    if (!response.ok) {
-      throw new Error('Failed to fetch filter options')
+    const endpoints = []
+    endpoints.push(queryString ? `${API_BASE}/filters?${queryString}` : `${API_BASE}/filters`)
+    if (queryString) {
+      endpoints.push(`${API_BASE}/filters`)
     }
-    return response.json()
+
+    let lastError = null
+    for (const endpoint of endpoints) {
+      debug('fetchFilters:request', { endpoint, filters })
+      const response = await fetch(endpoint)
+      if (response.ok) {
+        const payload = await response.json()
+        debug('fetchFilters:success', {
+          endpoint,
+          keys: Object.keys(payload || {}),
+          counts: {
+            productLines: payload?.productLines?.length ?? null,
+            projects: payload?.projects?.length ?? null,
+            standards: payload?.standards?.length ?? null,
+            testReports: payload?.testReports?.length ?? null,
+            reportNames: payload?.reportNames?.length ?? null
+          },
+          samples: {
+            productLines: payload?.productLines?.slice?.(0, 5) ?? [],
+            projects: payload?.projects?.slice?.(0, 5) ?? [],
+            standards: payload?.standards?.slice?.(0, 5) ?? []
+          }
+        })
+        return payload
+      }
+
+      const message = await response.text()
+      warn('fetchFilters:failed', { endpoint, status: response.status, message })
+      lastError = new Error(message || `Failed to fetch filter options (${response.status})`)
+    }
+
+    throw lastError ?? new Error('Failed to fetch filter options')
   }
 
   const fetchPerformanceData = async () => {
     const filters = collectFilters()
     const queryString = buildQueryString(filters)
     const endpoint = queryString ? `${API_BASE}/performance?${queryString}` : `${API_BASE}/performance`
+    debug('fetchPerformanceData:request', { endpoint, filters })
     const response = await fetch(endpoint)
     if (!response.ok) {
       const message = await response.text()
+      warn('fetchPerformanceData:failed', { endpoint, status: response.status, message })
       throw new Error(message || 'Failed to fetch performance data')
     }
-    return response.json()
+    const payload = await response.json()
+    debug('fetchPerformanceData:success', {
+      endpoint,
+      rowCount: payload?.data?.length ?? null,
+      summary: payload?.summary ?? null,
+      metadata: payload?.metadata ?? null,
+      sample: payload?.data?.slice?.(0, 3) ?? []
+    })
+    return payload
   }
 
   const prepareScenarioGroups = data => {
@@ -2206,6 +2289,8 @@
           const value = button.dataset.performanceDatatype
           if (!value) return
           selectedDataType = value
+          syncSelectedDataTypeToUrl()
+          syncSidebarDataTypeLinks()
           dataTypeTabs.querySelectorAll('[data-performance-datatype]').forEach(inner => {
             const isActive = inner.dataset.performanceDatatype === selectedDataType
             inner.classList.toggle('active', isActive)

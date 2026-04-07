@@ -7,10 +7,42 @@ body.dashboard-page .header > .container-fluid:first-child,
 body.dashboard-page .sidebar-header {
   min-height: var(--dashboard-header-height) !important;
   height: var(--dashboard-header-height);
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
 }
 
 body.dashboard-page .sidebar-header .sidebar-brand img.sidebar-brand-full {
   height: calc(var(--dashboard-header-height) - 20px);
+}
+
+body.dashboard-page .header {
+  margin-bottom: 0 !important;
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+}
+
+body.dashboard-page .header > .container-fluid:first-child {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+body.dashboard-page .header > .container-fluid + .container-fluid {
+  display: none !important;
+}
+
+body.dashboard-page .header .header-nav,
+body.dashboard-page .header .nav-item,
+body.dashboard-page .header .nav-link {
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+body.dashboard-page .header .nav-link {
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 
@@ -43,6 +75,20 @@ body.dashboard-page .sidebar-toggler {
 
 body.dashboard-page .wrapper {
   background: transparent;
+}
+
+body.dashboard-page .sidebar .nav-group-items .nav-link.active,
+body.dashboard-page .sidebar .nav-group-items .nav-link[aria-current='page'] {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--app-brand) 18%, transparent), color-mix(in srgb, var(--app-accent) 18%, transparent)) !important;
+  color: var(--app-heading) !important;
+  font-weight: 600;
+  border-radius: 0.85rem;
+}
+
+body.dashboard-page .sidebar .nav-group.show > .nav-link.is-section-active {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--app-brand) 22%, transparent), color-mix(in srgb, var(--app-accent) 22%, transparent)) !important;
+  color: var(--app-heading) !important;
+  font-weight: 600;
 }
 
 .dashboard-content {

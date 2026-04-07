@@ -225,6 +225,22 @@ const getCanonicalDataType = filters => {
   return raw
 }
 
+const shouldApplyReportTypeFilter = filters => {
+  const canonicalDataType = getCanonicalDataType(filters)
+  if (!canonicalDataType) {
+    return false
+  }
+
+  // In the migrated schema, performance datasets live in `performance`
+  // rows and are not reliably partitioned by `test_report.report_type`.
+  // Keep the UI datatype for presentation, but don't filter SQL by it.
+  if (canonicalDataType === 'PEAK_THROUGHPUT' || canonicalDataType === 'RVR' || canonicalDataType === 'RVO') {
+    return false
+  }
+
+  return true
+}
+
 export const buildPerformanceConditions = (filters, { exclude = [], includeBase = true } = {}) => {
   const conditions = []
   const params = []
@@ -287,7 +303,7 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
     addConditionForValues(conditions, params, 'p.bandwidth_mhz', filters.bandwidthsMhz)
   }
 
-  if (!exclude.includes('dataType')) {
+  if (!exclude.includes('dataType') && shouldApplyReportTypeFilter(filters)) {
     addConditionForValues(conditions, params, 'tr.report_type', filters.dataTypes)
   }
 
@@ -383,7 +399,7 @@ export const buildTestReportConditions = (filters, { exclude = [] } = {}) => {
     }
   }
 
-  if (!exclude.includes('dataType')) {
+  if (!exclude.includes('dataType') && shouldApplyReportTypeFilter(filters)) {
     addConditionForValues(conditions, params, 'tr.report_type', filters.dataTypes)
   }
 
