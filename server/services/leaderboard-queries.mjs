@@ -28,15 +28,15 @@ const bandWeightSql = weights => `
 
 const standardWeightSql = weights => `
   CASE
-    WHEN standard = '11n' THEN ${weights.standard['11n']}
-    WHEN standard = '11ac' THEN ${weights.standard['11ac']}
-    WHEN standard = '11ax' THEN ${weights.standard['11ax']}
-    WHEN standard = '11be' THEN ${weights.standard['11be']}
+    WHEN wifi_mode = '11n' THEN ${weights.standard['11n']}
+    WHEN wifi_mode = '11ac' THEN ${weights.standard['11ac']}
+    WHEN wifi_mode = '11ax' THEN ${weights.standard['11ax']}
+    WHEN wifi_mode = '11be' THEN ${weights.standard['11be']}
     ELSE ${weights.standard.default}
   END
 `
 
-const theoreticalPhyRateSql = (weights, standardColumn = 'standard', bandwidthColumn = 'bandwidth_mhz') => {
+const theoreticalPhyRateSql = (weights, standardColumn = 'wifi_mode', bandwidthColumn = 'bandwidth_mhz') => {
   const mapping = weights?.theoreticalCeiling?.phyRateMbpsByStandardBandwidth ?? null
   if (!mapping || typeof mapping !== 'object') return 'NULL'
 
@@ -73,19 +73,17 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
   const conditions = [...perfFilter.conditions]
   const params = [...perfFilter.params]
 
-  // Base requirements for throughput-based composite scoring.
   conditions.push('COALESCE(p.throughput_avg_mbps, p.throughput_peak_mbps, kv.throughput_mbps) IS NOT NULL')
   if (requireGolden) {
     conditions.push('tr.is_golden = 1')
   }
 
-  // Scenario-specific filters (can be extended later).
   if (scenario?.filters?.pathLossMin !== undefined) {
-    conditions.push('p.path_loss_db >= ?')
+    conditions.push('p.attenuation >= ?')
     params.push(scenario.filters.pathLossMin)
   }
   if (scenario?.filters?.pathLossMax !== undefined) {
-    conditions.push('p.path_loss_db <= ?')
+    conditions.push('p.attenuation <= ?')
     params.push(scenario.filters.pathLossMax)
   }
   if (scenario?.filters?.rssiMax !== undefined) {
@@ -93,7 +91,6 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
     params.push(scenario.filters.rssiMax)
   }
 
-  // If the caller didn't specify a time range, keep the query fast and relevant by default.
   if (!filters.startDate && !filters.endDate) {
     const days = Number.isFinite(Number(scenario.defaultDays)) ? Number(scenario.defaultDays) : 180
     conditions.push(`p.created_at >= DATE_SUB(NOW(), INTERVAL ${Math.max(1, Math.trunc(days))} DAY)`)
@@ -103,7 +100,7 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
   const bandWeight = bandWeightSql(weights)
   const standardWeight = standardWeightSql(weights)
   const defaultEfficiency = protocolEfficiencySql(weights, 'p.protocol')
-  const theoreticalPhyRate = theoreticalPhyRateSql(weights, 'p.standard', 'p.bandwidth_mhz')
+  const theoreticalPhyRate = theoreticalPhyRateSql(weights, 'p.wifi_mode', 'p.bandwidth_mhz')
   const whereClause = conditions.length ? conditions.join(' AND ') : '1=1'
 
   const sql = `
@@ -137,7 +134,6 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
         gs.brand,
         gs.product_line,
         gs.project_name,
-        NULL AS hardware_version,
         SUM(
           (${protocolWeight}) * (${bandWeight}) * (${standardWeight}) *
           (${weights.throughput.avg} * gs.avg_throughput_avg_mbps + ${weights.throughput.peak} * gs.avg_throughput_peak_mbps)
@@ -155,11 +151,10 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
       FROM (
         SELECT
           pr.id AS project_id,
-          pr.brand,
-          pr.product_line,
+          pr.customer AS brand,
+          pr.project_type AS product_line,
           pr.project_name,
-          NULL AS hardware_version,
-          p.standard,
+          p.wifi_mode,
           p.band,
           p.bandwidth_mhz,
           p.protocol,
@@ -170,23 +165,22 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
           COUNT(*) AS sample_count,
           MAX(p.created_at) AS last_updated_at
         FROM performance p
-        INNER JOIN execution ex ON ex.id = p.execution_id
-        INNER JOIN test_report tr ON tr.id = ex.test_report_id
+        INNER JOIN test_report tr ON tr.id = p.test_report_id
         INNER JOIN project pr ON pr.id = tr.project_id
-        INNER JOIN dut d ON d.id = ex.dut_id
+        LEFT JOIN dut d ON d.test_report_id = tr.id
         LEFT JOIN (
-          SELECT execution_id, AVG(metric_value) AS throughput_mbps
+          SELECT test_report_id, AVG(metric_value) AS throughput_mbps
           FROM perf_metric_kv
           WHERE metric_name = 'throughput'
-          GROUP BY execution_id
-        ) kv ON kv.execution_id = p.execution_id
+          GROUP BY test_report_id
+        ) kv ON kv.test_report_id = p.test_report_id
         WHERE ${whereClause}
         GROUP BY
           pr.id,
-          pr.brand,
-          pr.product_line,
+          pr.customer,
+          pr.project_type,
           pr.project_name,
-          p.standard,
+          p.wifi_mode,
           p.band,
           p.bandwidth_mhz,
           p.protocol
@@ -210,33 +204,32 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
         FROM (
           SELECT
             pr.id AS project_id,
-            pr.brand,
-            pr.product_line,
+            pr.customer AS brand,
+            pr.project_type AS product_line,
             pr.project_name,
-            p.standard,
+            p.wifi_mode,
             p.band,
             p.bandwidth_mhz,
             p.protocol,
             AVG(COALESCE(p.throughput_avg_mbps, kv.throughput_mbps)) AS avg_throughput_avg_mbps,
             AVG(COALESCE(p.throughput_peak_mbps, p.throughput_avg_mbps, kv.throughput_mbps)) AS avg_throughput_peak_mbps
-        FROM performance p
-        INNER JOIN execution ex ON ex.id = p.execution_id
-        INNER JOIN test_report tr ON tr.id = ex.test_report_id
-        INNER JOIN project pr ON pr.id = tr.project_id
-        INNER JOIN dut d ON d.id = ex.dut_id
-        LEFT JOIN (
-          SELECT execution_id, AVG(metric_value) AS throughput_mbps
-          FROM perf_metric_kv
-          WHERE metric_name = 'throughput'
-          GROUP BY execution_id
-        ) kv ON kv.execution_id = p.execution_id
-        WHERE ${whereClause}
+          FROM performance p
+          INNER JOIN test_report tr ON tr.id = p.test_report_id
+          INNER JOIN project pr ON pr.id = tr.project_id
+          LEFT JOIN dut d ON d.test_report_id = tr.id
+          LEFT JOIN (
+            SELECT test_report_id, AVG(metric_value) AS throughput_mbps
+            FROM perf_metric_kv
+            WHERE metric_name = 'throughput'
+            GROUP BY test_report_id
+          ) kv ON kv.test_report_id = p.test_report_id
+          WHERE ${whereClause}
           GROUP BY
             pr.id,
-            pr.brand,
-            pr.product_line,
+            pr.customer,
+            pr.project_type,
             pr.project_name,
-            p.standard,
+            p.wifi_mode,
             p.band,
             p.bandwidth_mhz,
             p.protocol
@@ -257,7 +250,6 @@ export const buildScenarioProjectLeaderboardQuery = ({ scenarioKey, filters, lim
     metric: 'composite_score',
     scoring: scenario?.scoring ?? null,
     sql,
-    // `whereClause` is used twice (main + max-rank subquery), so duplicate filter params.
     params: [...params, ...params, limit]
   }
 }

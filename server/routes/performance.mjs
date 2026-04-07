@@ -14,13 +14,13 @@ router.get('/', async (req, res, next) => {
 
   if (filters.deviceValue && !filters.deviceColumn) {
     return res.status(400).json({
-      error: 'deviceType must be adb_device or telnet_ip and used together with deviceValue'
+      error: 'deviceType must be adb_device or ip and used together with deviceValue'
     })
   }
 
   if (filters.deviceTypeRaw && !allowedDeviceOptions.includes(filters.deviceTypeRaw)) {
     return res.status(400).json({
-      error: 'Unsupported deviceType. Allowed values: adb_device or telnet_ip'
+      error: 'Unsupported deviceType. Allowed values: adb_device or ip'
     })
   }
 
@@ -44,43 +44,42 @@ router.get('/', async (req, res, next) => {
 
       let query = `
         SELECT
-          p.path_loss_db,
+          p.attenuation,
           COALESCE(p.throughput_avg_mbps, p.throughput_peak_mbps, kv.throughput_mbps) AS throughput_value_mbps,
           p.throughput_avg_mbps,
           p.throughput_peak_mbps,
           p.created_at,
-          p.execution_id,
+          p.test_report_id,
           p.scenario_group_key,
           p.band,
           p.bandwidth_mhz,
-          p.standard,
+          p.wifi_mode,
           p.direction,
-          p.center_freq_mhz,
-          p.angle_deg,
+          p.channel,
+          p.angle,
           p.test_category,
           p.protocol,
-          p.csv_name,
-          p.data_type,
+          tr.csv_name,
+          tr.report_type,
           tr.id AS test_report_id,
           tr.report_name,
           tr.case_path,
           tr.project_id,
-          pr.brand,
-          pr.product_line,
+          pr.customer,
+          pr.project_type,
           pr.project_name,
           d.adb_device,
-          d.telnet_ip
+          d.ip
         FROM performance p
-        INNER JOIN execution ex ON ex.id = p.execution_id
-        INNER JOIN test_report tr ON tr.id = ex.test_report_id
+        INNER JOIN test_report tr ON tr.id = p.test_report_id
         INNER JOIN project pr ON pr.id = tr.project_id
-        INNER JOIN dut d ON d.id = ex.dut_id
+        LEFT JOIN dut d ON d.test_report_id = tr.id
         LEFT JOIN (
-          SELECT execution_id, AVG(metric_value) AS throughput_mbps
+          SELECT test_report_id, AVG(metric_value) AS throughput_mbps
           FROM perf_metric_kv
           WHERE metric_name = 'throughput'
-          GROUP BY execution_id
-        ) kv ON kv.execution_id = p.execution_id
+          GROUP BY test_report_id
+        ) kv ON kv.test_report_id = p.test_report_id
       `
       if (performanceFilter.conditions.length > 0) {
         query += ` WHERE ${performanceFilter.conditions.join(' AND ')}`
@@ -88,7 +87,7 @@ router.get('/', async (req, res, next) => {
 
       query += `
         ORDER BY
-          p.path_loss_db ASC,
+          p.attenuation ASC,
           p.created_at ASC,
           p.id ASC
       `
@@ -108,7 +107,7 @@ router.get('/', async (req, res, next) => {
       }
 
       const data = effectiveRows.map(row => ({
-        pathLossDb: row.path_loss_db !== null ? Number(row.path_loss_db) : null,
+        pathLossDb: row.attenuation !== null ? Number(row.attenuation) : null,
         throughputAvgMbps: row.throughput_value_mbps !== null ? Number(row.throughput_value_mbps) : null,
         throughputSource: row.throughput_avg_mbps !== null
           ? 'throughput_avg_mbps'
@@ -116,27 +115,27 @@ router.get('/', async (req, res, next) => {
             ? 'throughput_peak_mbps'
             : 'perf_metric_kv',
         createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
-        executionId: row.execution_id ?? null,
+        executionId: row.test_report_id ?? null,
         testReportId: row.test_report_id ?? null,
         scenarioGroupKey: row.scenario_group_key ?? null,
         band: row.band ?? null,
         bandwidthMhz: row.bandwidth_mhz !== null ? Number(row.bandwidth_mhz) : null,
-        standard: row.standard ?? null,
+        standard: row.wifi_mode ?? null,
         direction: row.direction ?? null,
-        centerFreqMhz: row.center_freq_mhz !== null ? Number(row.center_freq_mhz) : null,
-        angleDeg: row.angle_deg !== null ? Number(row.angle_deg) : null,
+        centerFreqMhz: row.channel !== null ? Number(row.channel) : null,
+        angleDeg: row.angle !== null ? Number(row.angle) : null,
         testCategory: row.test_category ?? null,
         protocol: row.protocol ?? null,
         csvName: row.csv_name ?? null,
-        dataType: row.data_type ?? null,
+        dataType: row.report_type ?? null,
         reportName: row.report_name ?? null,
         casePath: row.case_path ?? null,
         projectId: row.project_id ?? null,
-        brand: row.brand ?? null,
-        productLine: row.product_line ?? null,
+        brand: row.customer ?? null,
+        productLine: row.project_type ?? null,
         project: row.project_name ?? null,
         adbDevice: row.adb_device ?? null,
-        telnetIp: row.telnet_ip ?? null
+        telnetIp: row.ip ?? null
       }))
 
       let throughputSum = 0

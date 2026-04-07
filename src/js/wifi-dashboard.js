@@ -1047,6 +1047,7 @@
     if (descriptor.band) parts.push(`BAND=${String(descriptor.band).toUpperCase()}`)
     if (descriptor.standard) parts.push(`STANDARD=${String(descriptor.standard).toUpperCase()}`)
     if (Number.isFinite(descriptor.bandwidthMhz)) parts.push(`BW=${descriptor.bandwidthMhz}`)
+    if (Number.isFinite(descriptor.channel)) parts.push(`CHANNEL=${descriptor.channel}`)
     if (parts.length > 0) return parts.join('|')
     return item.casePath || item.scenarioGroupKey || 'scenario'
   }
@@ -1112,6 +1113,9 @@
     }
     if (Number.isFinite(descriptor.bandwidthMhz)) {
       labelParts.push(`${descriptor.bandwidthMhz}MHz`)
+    }
+    if (Number.isFinite(descriptor.channel)) {
+      labelParts.push(`CH ${descriptor.channel}`)
     }
     if (labelParts.length === 0 && item.casePath) {
       labelParts.push(item.casePath)

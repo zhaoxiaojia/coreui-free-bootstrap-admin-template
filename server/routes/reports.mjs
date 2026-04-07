@@ -18,59 +18,55 @@ const clampLimit = raw => {
 }
 
 const reportFromSql = `
-  FROM performance p
-  INNER JOIN execution ex ON ex.id = p.execution_id
-  INNER JOIN test_report tr ON tr.id = ex.test_report_id
+  FROM test_report tr
   INNER JOIN project pr ON pr.id = tr.project_id
-  INNER JOIN dut d ON d.id = ex.dut_id
+  LEFT JOIN dut d ON d.test_report_id = tr.id
+  LEFT JOIN performance p ON p.test_report_id = tr.id
 `
 
 const reportSelectSql = `
   SELECT
-    p.execution_id AS report_id,
-    p.data_type,
-    MAX(p.csv_name) AS csv_name,
+    tr.id AS report_id,
+    tr.report_type AS data_type,
+    MAX(tr.csv_name) AS csv_name,
     MAX(tr.case_path) AS case_path,
     MAX(tr.report_name) AS report_name,
-    MAX(COALESCE(tr.updated_at, tr.created_at, ex.updated_at, ex.created_at, p.created_at)) AS last_updated_at,
+    MAX(COALESCE(tr.updated_at, tr.created_at, p.created_at)) AS last_updated_at,
     pr.id AS project_id,
-    pr.brand,
-    pr.product_line,
+    pr.customer AS brand,
+    pr.project_type AS product_line,
     pr.project_name,
-    pr.main_chip,
+    pr.soc AS main_chip,
     pr.wifi_module,
     pr.interface,
     pr.ecosystem,
-    COALESCE(d.mass_production_status, pr.mass_production_status) AS mass_production_status,
+    NULL AS mass_production_status,
     d.id AS dut_id,
-    d.serial_number AS dut_serial_number,
-    d.connect_type AS dut_connect_type,
+    d.sn AS dut_serial_number,
+    NULL AS dut_connect_type,
     d.software_version AS dut_software_version,
     d.adb_device AS dut_adb_device,
-    d.telnet_ip AS dut_telnet_ip
+    d.ip AS dut_telnet_ip
   ${reportFromSql}
 `
 
 const reportGroupBySql = `
   GROUP BY
-    p.execution_id,
-    p.data_type,
+    tr.id,
+    tr.report_type,
     pr.id,
-    pr.brand,
-    pr.product_line,
+    pr.customer,
+    pr.project_type,
     pr.project_name,
-    pr.main_chip,
+    pr.soc,
     pr.wifi_module,
     pr.interface,
     pr.ecosystem,
-    d.mass_production_status,
-    pr.mass_production_status,
     d.id,
-    d.serial_number,
-    d.connect_type,
+    d.sn,
     d.software_version,
     d.adb_device,
-    d.telnet_ip
+    d.ip
 `
 
 const toScoreKey = (projectId, dataType) => `${projectId}|${dataType}`
@@ -144,85 +140,8 @@ router.get('/recent', async (req, res, next) => {
     try {
       const [rows] = await connection.query(
         `
-          WITH base AS (
-            SELECT
-              p.execution_id AS report_id,
-              p.data_type,
-              MAX(p.csv_name) AS csv_name,
-              MAX(tr.case_path) AS case_path,
-              MAX(tr.report_name) AS report_name,
-              MAX(COALESCE(tr.updated_at, tr.created_at, ex.updated_at, ex.created_at, p.created_at)) AS last_updated_at,
-              tr.id AS test_report_id,
-              pr.id AS project_id,
-              pr.brand,
-              pr.product_line,
-              pr.project_name,
-              pr.main_chip,
-              pr.wifi_module,
-              pr.interface,
-              pr.ecosystem,
-              COALESCE(d.mass_production_status, pr.mass_production_status) AS mass_production_status,
-              d.id AS dut_id,
-              d.serial_number AS dut_serial_number,
-              d.connect_type AS dut_connect_type,
-              d.software_version AS dut_software_version,
-              d.adb_device AS dut_adb_device,
-              d.telnet_ip AS dut_telnet_ip
-            ${reportFromSql}
-            GROUP BY
-              p.execution_id,
-              p.data_type,
-              tr.id,
-              pr.id,
-              pr.brand,
-              pr.product_line,
-              pr.project_name,
-              pr.main_chip,
-              pr.wifi_module,
-              pr.interface,
-              pr.ecosystem,
-              d.mass_production_status,
-              pr.mass_production_status,
-              d.id,
-              d.serial_number,
-              d.connect_type,
-              d.software_version,
-              d.adb_device,
-              d.telnet_ip
-          ),
-          ranked AS (
-            SELECT
-              *,
-              ROW_NUMBER() OVER (
-                PARTITION BY test_report_id, data_type
-                ORDER BY last_updated_at DESC, report_id DESC
-              ) AS rn
-            FROM base
-          )
-          SELECT
-            report_id,
-            data_type,
-            csv_name,
-            case_path,
-            report_name,
-            last_updated_at,
-            project_id,
-            brand,
-            product_line,
-            project_name,
-            main_chip,
-            wifi_module,
-            interface,
-            ecosystem,
-            mass_production_status,
-            dut_id,
-            dut_serial_number,
-            dut_connect_type,
-            dut_software_version,
-            dut_adb_device,
-            dut_telnet_ip
-          FROM ranked
-          WHERE rn = 1
+          ${reportSelectSql}
+          ${reportGroupBySql}
           ORDER BY last_updated_at DESC, report_id DESC
           LIMIT ?
         `,
@@ -254,9 +173,6 @@ router.get('/', async (req, res, next) => {
   const wifiModule = typeof req.query.wifi_module === 'string' ? req.query.wifi_module.trim() : (typeof req.query.wifiModule === 'string' ? req.query.wifiModule.trim() : '')
   const iface = typeof req.query.interface === 'string' ? req.query.interface.trim() : ''
   const ecosystem = typeof req.query.ecosystem === 'string' ? req.query.ecosystem.trim() : ''
-  const massProductionStatus = typeof req.query.mass_production_status === 'string'
-    ? req.query.mass_production_status.trim()
-    : (typeof req.query.massProductionStatus === 'string' ? req.query.massProductionStatus.trim() : '')
   const dutConnectType = typeof req.query.dut_connect_type === 'string'
     ? req.query.dut_connect_type.trim()
     : (typeof req.query.dutConnectType === 'string' ? req.query.dutConnectType.trim() : '')
@@ -269,10 +185,10 @@ router.get('/', async (req, res, next) => {
 
       if (q) {
         if (numericId !== null) {
-          conditions.push('(p.execution_id = ? OR p.csv_name LIKE ? OR p.data_type LIKE ? OR tr.report_name LIKE ?)')
+          conditions.push('(tr.id = ? OR tr.csv_name LIKE ? OR tr.report_type LIKE ? OR tr.report_name LIKE ?)')
           params.push(numericId, `%${q}%`, `%${q}%`, `%${q}%`)
         } else {
-          conditions.push('(p.csv_name LIKE ? OR p.data_type LIKE ? OR tr.report_name LIKE ?)')
+          conditions.push('(tr.csv_name LIKE ? OR tr.report_type LIKE ? OR tr.report_name LIKE ?)')
           params.push(`%${q}%`, `%${q}%`, `%${q}%`)
         }
       }
@@ -283,22 +199,22 @@ router.get('/', async (req, res, next) => {
       }
 
       if (dataType) {
-        conditions.push('p.data_type = ?')
+        conditions.push('tr.report_type = ?')
         params.push(dataType)
       }
 
       if (brand) {
-        conditions.push('pr.brand = ?')
+        conditions.push('pr.customer = ?')
         params.push(brand)
       }
 
       if (productLine) {
-        conditions.push('pr.product_line = ?')
+        conditions.push('pr.project_type = ?')
         params.push(productLine)
       }
 
       if (mainChip) {
-        conditions.push('pr.main_chip = ?')
+        conditions.push('pr.soc = ?')
         params.push(mainChip)
       }
 
@@ -317,14 +233,8 @@ router.get('/', async (req, res, next) => {
         params.push(ecosystem)
       }
 
-      if (massProductionStatus) {
-        conditions.push('COALESCE(d.mass_production_status, pr.mass_production_status) = ?')
-        params.push(massProductionStatus)
-      }
-
       if (dutConnectType) {
-        conditions.push('d.connect_type = ?')
-        params.push(dutConnectType)
+        conditions.push('1 = 0')
       }
 
       const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
@@ -351,7 +261,7 @@ router.get('/', async (req, res, next) => {
         wifiModule,
         interface: iface,
         ecosystem,
-        massProductionStatus,
+        massProductionStatus: null,
         dutConnectType,
         limit,
         rows: (rows ?? []).map(row => mapReportRow(row, scoreMap))
@@ -384,7 +294,7 @@ router.get('/batch/by-ids', async (req, res, next) => {
       const [rows] = await connection.query(
         `
           ${reportSelectSql}
-          WHERE p.execution_id IN (${placeholders})
+          WHERE tr.id IN (${placeholders})
           ${reportGroupBySql}
         `,
         ids
@@ -412,10 +322,10 @@ router.get('/types', async (req, res, next) => {
     try {
       const [rows] = await connection.query(
         `
-          SELECT DISTINCT p.data_type AS data_type
-          FROM performance p
-          WHERE p.data_type IS NOT NULL AND p.data_type <> ''
-          ORDER BY p.data_type
+          SELECT DISTINCT tr.report_type AS data_type
+          FROM test_report tr
+          WHERE tr.report_type IS NOT NULL AND tr.report_type <> ''
+          ORDER BY tr.report_type
         `
       )
       res.json({ rows: rows.map(row => ({ dataType: row.data_type })) })
@@ -435,9 +345,9 @@ router.get('/:id', async (req, res, next) => {
     const connection = await pool.getConnection()
     try {
       const params = [reportId]
-      let whereSql = 'WHERE p.execution_id = ?'
+      let whereSql = 'WHERE tr.id = ?'
       if (dataType) {
-        whereSql += ' AND p.data_type = ?'
+        whereSql += ' AND tr.report_type = ?'
         params.push(dataType)
       }
 

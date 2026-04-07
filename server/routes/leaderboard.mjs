@@ -122,10 +122,10 @@ router.get('/', async (req, res, next) => {
       let query = `
         SELECT
           pr.id AS project_id,
-          pr.brand,
-          pr.product_line,
+          pr.customer AS brand,
+          pr.project_type AS product_line,
           pr.project_name,
-          p.standard,
+          p.wifi_mode AS standard,
           p.band,
           p.bandwidth_mhz,
           p.protocol,
@@ -134,10 +134,9 @@ router.get('/', async (req, res, next) => {
           COUNT(*) AS sample_count,
           MAX(p.created_at) AS last_updated_at
         FROM performance p
-        INNER JOIN execution ex ON ex.id = p.execution_id
-        INNER JOIN test_report tr ON tr.id = ex.test_report_id
+        INNER JOIN test_report tr ON tr.id = p.test_report_id
         INNER JOIN project pr ON pr.id = tr.project_id
-        INNER JOIN dut d ON d.id = ex.dut_id
+        LEFT JOIN dut d ON d.test_report_id = tr.id
       `
       if (conditions.length > 0) {
         query += ` WHERE ${conditions.join(' AND ')}`
@@ -146,10 +145,10 @@ router.get('/', async (req, res, next) => {
       query += `
         GROUP BY
           pr.id,
-          pr.brand,
-          pr.product_line,
+          pr.customer,
+          pr.project_type,
           pr.project_name,
-          p.standard,
+          p.wifi_mode,
           p.band,
           p.bandwidth_mhz,
           p.protocol,

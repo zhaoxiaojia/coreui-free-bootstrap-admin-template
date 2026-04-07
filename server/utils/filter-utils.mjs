@@ -53,7 +53,7 @@ const parseEndDate = value => {
   return date
 }
 
-const allowedDeviceColumns = new Set(['adb_device', 'telnet_ip'])
+const allowedDeviceColumns = new Set(['adb_device', 'ip'])
 
 const flattenQueryValue = value => {
   if (Array.isArray(value)) {
@@ -218,7 +218,7 @@ const getCanonicalDataType = filters => {
     return null
   }
 
-  if (raw === 'THROUGHPUT' || raw === 'PERFORMANCE' || raw === 'PEAK THROUGHPUT') {
+  if (raw === 'THROUGHPUT' || raw === 'PERFORMANCE' || raw === 'PEAK THROUGHPUT' || raw === 'PEAK_THROUGHPUT') {
     return 'PEAK_THROUGHPUT'
   }
 
@@ -235,11 +235,11 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
     // Base field requirements must follow the selected data type instead of
     // forcing one global rule across Peak/RVR/RVO.
     if (canonicalDataType === 'RVO') {
-      conditions.push('p.path_loss_db IS NOT NULL')
+      conditions.push('p.attenuation IS NOT NULL')
       conditions.push('COALESCE(p.throughput_avg_mbps, p.throughput_peak_mbps, kv.throughput_mbps) IS NOT NULL')
-      conditions.push('p.angle_deg IS NOT NULL')
+      conditions.push('p.angle IS NOT NULL')
     } else if (canonicalDataType === 'RVR') {
-      conditions.push('p.path_loss_db IS NOT NULL')
+      conditions.push('p.attenuation IS NOT NULL')
       conditions.push('COALESCE(p.throughput_avg_mbps, p.throughput_peak_mbps, kv.throughput_mbps) IS NOT NULL')
     } else {
       conditions.push('COALESCE(p.throughput_avg_mbps, p.throughput_peak_mbps, kv.throughput_mbps) IS NOT NULL')
@@ -247,7 +247,7 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
   }
 
   if (!exclude.includes('productLine')) {
-    addConditionForValues(conditions, params, 'pr.product_line', filters.productLines)
+    addConditionForValues(conditions, params, 'pr.project_type', filters.productLines)
   }
 
   if (!exclude.includes('projectId')) {
@@ -276,7 +276,7 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
   }
 
   if (!exclude.includes('standard')) {
-    addConditionForValues(conditions, params, 'p.standard', filters.standards)
+    addConditionForValues(conditions, params, 'p.wifi_mode', filters.standards)
   }
 
   if (!exclude.includes('band')) {
@@ -288,16 +288,16 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
   }
 
   if (!exclude.includes('dataType')) {
-    addConditionForValues(conditions, params, 'p.data_type', filters.dataTypes)
+    addConditionForValues(conditions, params, 'tr.report_type', filters.dataTypes)
   }
 
   if (!exclude.includes('pathLoss') && filters.pathLossMin != null) {
-    conditions.push('p.path_loss_db >= ?')
+    conditions.push('p.attenuation >= ?')
     params.push(filters.pathLossMin)
   }
 
   if (!exclude.includes('pathLoss') && filters.pathLossMax != null) {
-    conditions.push('p.path_loss_db <= ?')
+    conditions.push('p.attenuation <= ?')
     params.push(filters.pathLossMax)
   }
 
@@ -312,7 +312,7 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
   }
 
   if (!exclude.includes('testReport')) {
-    addConditionForValues(conditions, params, 'ex.csv_name', filters.testReportCsvNames)
+    addConditionForValues(conditions, params, 'tr.csv_name', filters.testReportCsvNames)
     addConditionForValues(conditions, params, 'tr.report_name', filters.reportNames)
   }
 
@@ -337,7 +337,7 @@ export const buildTestReportConditions = (filters, { exclude = [] } = {}) => {
   let requiresPerformanceJoin = false
 
   if (!exclude.includes('productLine')) {
-    addConditionForValues(conditions, params, 'pr.product_line', filters.productLines)
+    addConditionForValues(conditions, params, 'pr.project_type', filters.productLines)
   }
 
   if (!exclude.includes('projectId')) {
@@ -366,7 +366,7 @@ export const buildTestReportConditions = (filters, { exclude = [] } = {}) => {
   }
 
   if (!exclude.includes('standard')) {
-    if (addConditionForValues(conditions, params, 'p.standard', filters.standards)) {
+    if (addConditionForValues(conditions, params, 'p.wifi_mode', filters.standards)) {
       requiresPerformanceJoin = true
     }
   }
@@ -384,26 +384,22 @@ export const buildTestReportConditions = (filters, { exclude = [] } = {}) => {
   }
 
   if (!exclude.includes('dataType')) {
-    if (addConditionForValues(conditions, params, 'p.data_type', filters.dataTypes)) {
-      requiresPerformanceJoin = true
-    }
+    addConditionForValues(conditions, params, 'tr.report_type', filters.dataTypes)
   }
 
   if (!exclude.includes('testReport')) {
-    addConditionForValues(conditions, params, 'ex.csv_name', filters.testReportCsvNames)
+    addConditionForValues(conditions, params, 'tr.csv_name', filters.testReportCsvNames)
     addConditionForValues(conditions, params, 'tr.report_name', filters.reportNames)
   }
 
   if (!exclude.includes('startDate') && filters.startDate) {
-    conditions.push('p.created_at >= ?')
+    conditions.push(`${requiresPerformanceJoin ? 'p' : 'tr'}.created_at >= ?`)
     params.push(filters.startDate)
-    requiresPerformanceJoin = true
   }
 
   if (!exclude.includes('endDate') && filters.endDate) {
-    conditions.push('p.created_at <= ?')
+    conditions.push(`${requiresPerformanceJoin ? 'p' : 'tr'}.created_at <= ?`)
     params.push(filters.endDate)
-    requiresPerformanceJoin = true
   }
 
   return { conditions, params, requiresPerformanceJoin }
