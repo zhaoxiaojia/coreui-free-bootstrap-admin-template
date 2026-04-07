@@ -66,6 +66,20 @@ router.get('/', async (req, res, next) => {
         ORDER BY count DESC, report_type ASC
       `)
 
+      const [reportNameBuckets] = await connection.query(`
+        SELECT
+          CASE
+            WHEN UPPER(COALESCE(report_name, csv_name, '')) LIKE 'RVR%' THEN 'RVR'
+            WHEN UPPER(COALESCE(report_name, csv_name, '')) LIKE 'RVO%' THEN 'RVO'
+            WHEN UPPER(COALESCE(report_name, csv_name, '')) LIKE 'PERFORMANCE%' THEN 'PEAK_THROUGHPUT'
+            ELSE 'OTHER'
+          END AS bucket,
+          COUNT(*) AS count
+        FROM test_report
+        GROUP BY bucket
+        ORDER BY bucket ASC
+      `)
+
       const projectFilter = buildTestReportConditions(filters, { exclude: ['project'] })
       const projectJoinPerf = projectFilter.requiresPerformanceJoin
         ? 'INNER JOIN performance p ON p.test_report_id = tr.id'
@@ -182,6 +196,10 @@ router.get('/', async (req, res, next) => {
         },
         reportTypes: reportTypes.map(row => ({
           report_type: row.report_type,
+          count: Number(row.count)
+        })),
+        reportNameBuckets: reportNameBuckets.map(row => ({
+          bucket: row.bucket,
           count: Number(row.count)
         }))
       })

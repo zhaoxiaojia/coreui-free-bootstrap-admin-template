@@ -225,6 +225,32 @@ const getCanonicalDataType = filters => {
   return raw
 }
 
+const addCanonicalDataTypeNameCondition = (conditions, params, filters, tableAlias = 'tr') => {
+  const canonicalDataType = getCanonicalDataType(filters)
+  const resolvedName = `COALESCE(${tableAlias}.report_name, ${tableAlias}.csv_name, '')`
+  const resolvedType = `COALESCE(${tableAlias}.report_type, '')`
+
+  if (canonicalDataType === 'PEAK_THROUGHPUT') {
+    conditions.push(`(
+      UPPER(${resolvedName}) LIKE 'PERFORMANCE%'
+      OR UPPER(${resolvedType}) LIKE 'PEAK%'
+    )`)
+    return canonicalDataType
+  }
+
+  if (canonicalDataType === 'RVR') {
+    conditions.push(`UPPER(${resolvedName}) LIKE 'RVR%'`)
+    return canonicalDataType
+  }
+
+  if (canonicalDataType === 'RVO') {
+    conditions.push(`UPPER(${resolvedName}) LIKE 'RVO%'`)
+    return canonicalDataType
+  }
+
+  return canonicalDataType
+}
+
 const shouldApplyReportTypeFilter = filters => {
   const canonicalDataType = getCanonicalDataType(filters)
   if (!canonicalDataType) {
@@ -244,10 +270,9 @@ const shouldApplyReportTypeFilter = filters => {
 export const buildPerformanceConditions = (filters, { exclude = [], includeBase = true } = {}) => {
   const conditions = []
   const params = []
+  const canonicalDataType = getCanonicalDataType(filters)
 
   if (includeBase) {
-    const canonicalDataType = getCanonicalDataType(filters)
-
     // Base field requirements must follow the selected data type instead of
     // forcing one global rule across Peak/RVR/RVO.
     if (canonicalDataType === 'RVO') {
@@ -305,6 +330,10 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
 
   if (!exclude.includes('dataType') && shouldApplyReportTypeFilter(filters)) {
     addConditionForValues(conditions, params, 'tr.report_type', filters.dataTypes)
+  }
+
+  if (!exclude.includes('dataTypeNameScope')) {
+    addCanonicalDataTypeNameCondition(conditions, params, filters, 'tr')
   }
 
   if (!exclude.includes('pathLoss') && filters.pathLossMin != null) {
@@ -401,6 +430,10 @@ export const buildTestReportConditions = (filters, { exclude = [] } = {}) => {
 
   if (!exclude.includes('dataType') && shouldApplyReportTypeFilter(filters)) {
     addConditionForValues(conditions, params, 'tr.report_type', filters.dataTypes)
+  }
+
+  if (!exclude.includes('dataTypeNameScope')) {
+    addCanonicalDataTypeNameCondition(conditions, params, filters, 'tr')
   }
 
   if (!exclude.includes('testReport')) {

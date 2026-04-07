@@ -128,6 +128,8 @@ router.get('/', async (req, res, next) => {
         rowCount: rows.length,
         sample: rows.slice(0, 3).map(row => ({
           project_name: row.project_name,
+          report_name: row.report_name,
+          csv_name: row.csv_name,
           report_type: row.report_type,
           wifi_mode: row.wifi_mode,
           attenuation: row.attenuation,
