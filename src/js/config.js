@@ -8,6 +8,7 @@
 (() => {
   const debug = (...args) => console.info('[wifi-config]', ...args)
   const warn = (...args) => console.warn('[wifi-config]', ...args)
+  const SIDEBAR_DATATYPE_KEY = 'wifi-dashboard-last-datatype'
   const THEME_SKIN_KEY = 'coreui-free-bootstrap-admin-template-theme-skin'
   const MODE_KEY = 'coreui-free-bootstrap-admin-template-app-mode'
   const urlParams = new URLSearchParams(window.location.href.split('?')[1])
@@ -272,6 +273,43 @@
     })
   }
 
+  const registerWifiSidebarLinkTracing = () => {
+    const sidebarNav = document.querySelector('#sidebar ul.sidebar-nav')
+    if (!sidebarNav) {
+      warn('registerWifiSidebarLinkTracing:no_sidebar_nav')
+      return
+    }
+
+    const selector = ".nav-group-items .nav-link[href*='wifi-dashboard.html?datatype='], .nav-group-items .nav-link[href='wifi-ota.html'], .nav-group-items .nav-link[href='wifi-function.html'], .nav-group-items .nav-link[href='wifi-compatibility.html'], .nav-group-items .nav-link[href='wifi-home.html'], .nav-group-items .nav-link[href='wifi-interference.html'], .nav-group-items .nav-link[href='projects-progress.html']"
+    sidebarNav.querySelectorAll(selector).forEach(link => {
+      link.addEventListener('click', event => {
+        const href = link.getAttribute('href') || ''
+        let datatype = null
+        if (href.includes('wifi-dashboard.html?datatype=')) {
+          try {
+            datatype = (new URL(href, window.location.origin).searchParams.get('datatype') || '').toUpperCase() || null
+          } catch {
+            datatype = null
+          }
+        }
+
+        if (datatype) {
+          sessionStorage.setItem(SIDEBAR_DATATYPE_KEY, datatype)
+        } else {
+          sessionStorage.removeItem(SIDEBAR_DATATYPE_KEY)
+        }
+
+        debug('sidebar_link_click', {
+          text: (link.textContent || '').trim(),
+          href,
+          datatype,
+          currentHref: window.location.href,
+          defaultPrevented: event.defaultPrevented
+        })
+      })
+    })
+  }
+
   const debugHeaderLayout = () => {
     const header = document.querySelector('body.dashboard-page .header')
     if (!header) {
@@ -291,6 +329,23 @@
       count: header.children.length,
       rows: headerRows
     })
+
+    const computed = window.getComputedStyle(header)
+    debug('debugHeaderLayout:computed', {
+      position: computed.position,
+      top: computed.top,
+      left: computed.left,
+      right: computed.right,
+      zIndex: computed.zIndex,
+      width: computed.width,
+      transform: computed.transform,
+      rect: header.getBoundingClientRect().toJSON ? header.getBoundingClientRect().toJSON() : {
+        top: header.getBoundingClientRect().top,
+        left: header.getBoundingClientRect().left,
+        width: header.getBoundingClientRect().width,
+        height: header.getBoundingClientRect().height
+      }
+    })
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -300,6 +355,7 @@
     })
     applyMinimalSidebar()
     syncWifiSidebarState()
+    registerWifiSidebarLinkTracing()
     debugHeaderLayout()
   })
 })()

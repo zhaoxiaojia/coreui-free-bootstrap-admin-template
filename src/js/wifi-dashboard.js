@@ -11,6 +11,7 @@
 (() => {
   const debug = (...args) => console.info('[wifi-dashboard]', ...args)
   const warn = (...args) => console.warn('[wifi-dashboard]', ...args)
+  const SIDEBAR_DATATYPE_KEY = 'wifi-dashboard-last-datatype'
   const DEFAULT_API_BASE = new URL('/api', window.location.origin).toString()
   const API_BASE = window.WIFI_DASHBOARD_API_BASE ?? DEFAULT_API_BASE
   const DEFAULT_LIMIT = Number.parseInt(window.WIFI_DASHBOARD_MAX_POINTS ?? '1000', 10)
@@ -69,6 +70,11 @@
     return null
   }
 
+  const getSelectedDataTypeFromSession = () => {
+    const stored = (sessionStorage.getItem(SIDEBAR_DATATYPE_KEY) || '').trim().toUpperCase()
+    return DATA_TYPE_OPTIONS.some(option => option.value === stored) ? stored : null
+  }
+
   const syncSidebarDataTypeLinks = () => {
     const sidebarLinks = document.querySelectorAll(".sidebar .nav-group-items .nav-link[href*='wifi-dashboard.html?datatype=']")
     let hasActiveChild = false
@@ -118,6 +124,7 @@
     url.pathname = `${url.pathname.replace(/\/[^/]*$/, '')}/wifi-dashboard.html`
     url.searchParams.set('datatype', selectedDataType)
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+    sessionStorage.setItem(SIDEBAR_DATATYPE_KEY, selectedDataType)
     debug('syncSelectedDataTypeToUrl', {
       selectedDataType,
       href: window.location.href
@@ -2245,8 +2252,15 @@
       return
     }
 
-    selectedDataType = getSelectedDataTypeFromUrl() ?? selectedDataType
+    selectedDataType = getSelectedDataTypeFromUrl() ?? getSelectedDataTypeFromSession() ?? selectedDataType
+    sessionStorage.setItem(SIDEBAR_DATATYPE_KEY, selectedDataType)
     restoredFilterState = loadFilterState()
+    debug('init:selectedDataType', {
+      fromUrl: getSelectedDataTypeFromUrl(),
+      fromSession: getSelectedDataTypeFromSession(),
+      resolved: selectedDataType,
+      href: window.location.href
+    })
     syncSidebarDataTypeLinks()
 
     registerMultiSelect(productLineSelect, { placeholder: 'All Product Lines' })
@@ -2288,6 +2302,11 @@
         button.addEventListener('click', () => {
           const value = button.dataset.performanceDatatype
           if (!value) return
+          debug('datatype_tab_click', {
+            from: selectedDataType,
+            to: value,
+            hrefBefore: window.location.href
+          })
           selectedDataType = value
           syncSelectedDataTypeToUrl()
           syncSidebarDataTypeLinks()

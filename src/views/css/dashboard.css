@@ -18,8 +18,10 @@ body.dashboard-page .sidebar-header .sidebar-brand img.sidebar-brand-full {
 
 body.dashboard-page .header {
   margin-bottom: 0 !important;
-  position: sticky;
-  top: 0;
+  position: fixed !important;
+  top: 0 !important;
+  left: var(--cui-sidebar-occupy-start, 16rem);
+  right: 0;
   z-index: 1030;
 }
 
@@ -75,6 +77,13 @@ body.dashboard-page .sidebar-toggler {
 
 body.dashboard-page .wrapper {
   background: transparent;
+  padding-top: var(--dashboard-header-height);
+}
+
+@media (max-width: 991.98px) {
+  body.dashboard-page .header {
+    left: 0;
+  }
 }
 
 body.dashboard-page .sidebar .nav-group-items .nav-link.active,
