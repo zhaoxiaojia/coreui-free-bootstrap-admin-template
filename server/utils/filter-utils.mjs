@@ -126,6 +126,15 @@ const addConditionForValues = (conditions, params, column, values) => {
   return true
 }
 
+const addResolvedReportNameCondition = (conditions, params, values, tableAlias = 'tr') => {
+  return addConditionForValues(
+    conditions,
+    params,
+    `COALESCE(${tableAlias}.report_name, ${tableAlias}.csv_name, '')`,
+    values
+  )
+}
+
 export const normalizeFilters = query => {
   const productLines = uniqueValues(parseStringList(query.product_line ?? query.productLine))
   const projects = uniqueValues(parseStringList(query.project ?? query.project_name ?? query.projectName))
@@ -212,7 +221,7 @@ export const buildDutConditions = (filters, { exclude = [] } = {}) => {
   return { conditions, params }
 }
 
-const getCanonicalDataType = filters => {
+export const getCanonicalDataType = filters => {
   const raw = typeof filters?.dataType === 'string' ? filters.dataType.trim().toUpperCase() : ''
   if (!raw) {
     return null
@@ -276,7 +285,6 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
     // Base field requirements must follow the selected data type instead of
     // forcing one global rule across Peak/RVR/RVO.
     if (canonicalDataType === 'RVO') {
-      conditions.push('p.attenuation IS NOT NULL')
       conditions.push('COALESCE(p.throughput_avg_mbps, p.throughput_peak_mbps, kv.throughput_mbps) IS NOT NULL')
       conditions.push('p.angle IS NOT NULL')
     } else if (canonicalDataType === 'RVR') {
@@ -357,8 +365,8 @@ export const buildPerformanceConditions = (filters, { exclude = [], includeBase 
   }
 
   if (!exclude.includes('testReport')) {
-    addConditionForValues(conditions, params, 'tr.csv_name', filters.testReportCsvNames)
-    addConditionForValues(conditions, params, 'tr.report_name', filters.reportNames)
+    addResolvedReportNameCondition(conditions, params, filters.testReportCsvNames)
+    addResolvedReportNameCondition(conditions, params, filters.reportNames)
   }
 
   if (!exclude.includes('startDate') && filters.startDate) {
@@ -437,8 +445,8 @@ export const buildTestReportConditions = (filters, { exclude = [] } = {}) => {
   }
 
   if (!exclude.includes('testReport')) {
-    addConditionForValues(conditions, params, 'tr.csv_name', filters.testReportCsvNames)
-    addConditionForValues(conditions, params, 'tr.report_name', filters.reportNames)
+    addResolvedReportNameCondition(conditions, params, filters.testReportCsvNames)
+    addResolvedReportNameCondition(conditions, params, filters.reportNames)
   }
 
   if (!exclude.includes('startDate') && filters.startDate) {

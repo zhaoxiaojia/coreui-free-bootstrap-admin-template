@@ -192,7 +192,8 @@ router.get('/', async (req, res, next) => {
           productLines: productLines.slice(0, 5).map(row => row.project_type),
           projects: projects.slice(0, 5).map(row => row.value),
           standards: standards.slice(0, 5).map(row => row.value),
-          testReports: testReports.slice(0, 5).map(row => row.value)
+          testReports: testReports.slice(0, 5).map(row => row.value),
+          reportNames: reportNames.slice(0, 5).map(row => row.value)
         },
         reportTypes: reportTypes.map(row => ({
           report_type: row.report_type,
@@ -201,7 +202,11 @@ router.get('/', async (req, res, next) => {
         reportNameBuckets: reportNameBuckets.map(row => ({
           bucket: row.bucket,
           count: Number(row.count)
-        }))
+        })),
+        selectedReportFilters: {
+          csvNames: filters.testReportCsvNames,
+          reportNames: filters.reportNames
+        }
       })
 
       res.json({

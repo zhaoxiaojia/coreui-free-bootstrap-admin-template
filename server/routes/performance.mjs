@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import pool from '../db.mjs'
-import { allowedDeviceOptions, buildPerformanceConditions, normalizeFilters } from '../utils/filter-utils.mjs'
+import { allowedDeviceOptions, buildPerformanceConditions, getCanonicalDataType, normalizeFilters } from '../utils/filter-utils.mjs'
 import { createLogger } from '../utils/logger.mjs'
 
 const router = Router()
@@ -13,6 +13,7 @@ const MAX_LIMIT = Number.parseInt(process.env.API_MAX_LIMIT ?? '5000', 10)
 
 router.get('/', async (req, res, next) => {
   const filters = normalizeFilters(req.query)
+  const canonicalDataType = getCanonicalDataType(filters)
   logger.info('performance_request_received', {
     rawQuery: req.query ?? {},
     normalizedFilters: {
@@ -133,10 +134,46 @@ router.get('/', async (req, res, next) => {
           report_type: row.report_type,
           wifi_mode: row.wifi_mode,
           attenuation: row.attenuation,
+          angle: row.angle,
           throughput_avg_mbps: row.throughput_avg_mbps,
           created_at: row.created_at
         }))
       })
+
+      if (rows.length === 0 && (canonicalDataType === 'RVO' || canonicalDataType === 'RVR')) {
+        let diagnosticQuery = `
+          SELECT
+            COUNT(*) AS candidate_count,
+            SUM(CASE WHEN p.angle IS NOT NULL THEN 1 ELSE 0 END) AS angle_present_count,
+            SUM(CASE WHEN p.attenuation IS NOT NULL THEN 1 ELSE 0 END) AS attenuation_present_count,
+            SUM(CASE WHEN COALESCE(p.throughput_avg_mbps, p.throughput_peak_mbps, kv.throughput_mbps) IS NOT NULL THEN 1 ELSE 0 END) AS throughput_present_count
+          FROM performance p
+          INNER JOIN test_report tr ON tr.id = p.test_report_id
+          INNER JOIN project pr ON pr.id = tr.project_id
+          LEFT JOIN dut d ON d.test_report_id = tr.id
+          LEFT JOIN (
+            SELECT test_report_id, AVG(metric_value) AS throughput_mbps
+            FROM perf_metric_kv
+            WHERE metric_name = 'throughput'
+            GROUP BY test_report_id
+          ) kv ON kv.test_report_id = p.test_report_id
+        `
+        const diagnosticFilter = buildPerformanceConditions(filters, { includeBase: false })
+        if (diagnosticFilter.conditions.length > 0) {
+          diagnosticQuery += ` WHERE ${diagnosticFilter.conditions.join(' AND ')}`
+        }
+        const [diagnosticRows] = await connection.query(diagnosticQuery, diagnosticFilter.params)
+        logger.info('performance_zero_result_diagnostics', {
+          canonicalDataType,
+          conditionsWithoutBase: diagnosticFilter.conditions,
+          paramsWithoutBase: diagnosticFilter.params,
+          diagnostic: diagnosticRows?.[0] ?? null,
+          selectedReportFilters: {
+            csvNames: filters.testReportCsvNames,
+            reportNames: filters.reportNames
+          }
+        })
+      }
 
       let truncated = false
       let effectiveRows = rows
