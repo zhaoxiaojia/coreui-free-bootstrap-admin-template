@@ -86,6 +86,7 @@ router.get('/', async (req, res, next) => {
           tr.case_path,
           tr.project_id,
           pr.customer,
+          pr.nickname AS project_nickname,
           pr.project_type,
           pr.project_name,
           d.adb_device,
@@ -209,6 +210,7 @@ router.get('/', async (req, res, next) => {
         projectId: row.project_id ?? null,
         brand: row.customer ?? null,
         productLine: row.project_type ?? null,
+        projectNickname: row.project_nickname ?? null,
         project: row.project_name ?? null,
         adbDevice: row.adb_device ?? null,
         telnetIp: row.ip ?? null

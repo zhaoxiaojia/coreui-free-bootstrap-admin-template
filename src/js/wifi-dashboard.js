@@ -41,15 +41,30 @@
   const CHART_LAYOUT = {
     PEAK_THROUGHPUT: {
       minHeight: 320,
-      emptyStateMaxWidth: 420
+      emptyStateMaxWidth: 420,
+      containerPadding: '1.25rem',
+      scenarioGapClass: 'gap-3',
+      directionTitleClass: 'fw-semibold mb-3',
+      containerMaxWidth: null,
+      containerHeight: null
     },
     RVR: {
-      minHeight: 240,
-      emptyStateMaxWidth: 320
+      minHeight: 168,
+      emptyStateMaxWidth: 300,
+      containerPadding: '0.5rem',
+      scenarioGapClass: 'gap-2',
+      directionTitleClass: 'fw-semibold mb-2',
+      containerMaxWidth: null,
+      containerHeight: 'min(55vh, 432px)'
     },
     RVO: {
-      minHeight: 220,
-      emptyStateMaxWidth: 280
+      minHeight: 168,
+      emptyStateMaxWidth: 300,
+      containerPadding: '0.5rem',
+      scenarioGapClass: 'gap-2',
+      directionTitleClass: 'fw-semibold mb-2',
+      containerMaxWidth: null,
+      containerHeight: 'min(55vh, 432px)'
     }
   }
   const chartGroupsContainer = document.getElementById('performanceChartGroups')
@@ -439,7 +454,7 @@
           } else {
             this.selectAll(false)
           }
-          this.focusSearch()
+          this.close()
         })
       } else {
         this.selectAllButton.classList.add('d-none')
@@ -1073,6 +1088,15 @@
     return null
   }
 
+  const formatProjectLabel = item => {
+    const nickname = (item?.projectNickname ?? '').trim()
+    if (nickname) return nickname
+    if (item?.projectId !== null && item?.projectId !== undefined) return `Project ${item.projectId}`
+    const projectName = (item?.project ?? '').trim()
+    if (projectName) return projectName
+    return 'Unknown Project'
+  }
+
   const buildSeriesKey = item => {
     const reportComponent = item.testReportId !== null && item.testReportId !== undefined
       ? String(item.testReportId)
@@ -1115,14 +1139,15 @@
   const buildDatasetLabel = item => {
     const descriptor = resolveScenarioDescriptor(item)
     const baseLabel =
-      item.project ||
+      formatProjectLabel(item) ||
       item.reportName ||
       (item.testReportId !== null && item.testReportId !== undefined ? `Report ${item.testReportId}` : 'Unknown Project')
     if (descriptor.channel !== null && descriptor.channel !== undefined) {
       return `${baseLabel} CH ${descriptor.channel}`
     }
     const parts = []
-    if (item.project) parts.push(item.project)
+    const projectLabel = formatProjectLabel(item)
+    if (projectLabel && projectLabel !== 'Unknown Project') parts.push(projectLabel)
     if (descriptor.band) {
       const bandLabel = formatBand(descriptor.band) || descriptor.band
       if (bandLabel) parts.push(bandLabel)
@@ -1608,7 +1633,7 @@
     }
 
     const section = document.createElement('section')
-    section.className = 'chart-scenario d-flex flex-column gap-3'
+    section.className = `chart-scenario d-flex flex-column ${getChartLayout().scenarioGapClass || 'gap-3'}`
     section.dataset.scenarioKey = scenarioKey
 
     const title = document.createElement('h6')
@@ -1623,17 +1648,29 @@
       directionSection.className = 'chart-section'
 
       const directionTitle = document.createElement('h6')
-      directionTitle.className = 'fw-semibold mb-3'
+      directionTitle.className = getChartLayout().directionTitleClass || 'fw-semibold mb-3'
       directionTitle.textContent = DIRECTION_SETTINGS[direction].label
       directionSection.appendChild(directionTitle)
 
       const container = document.createElement('div')
       container.className = 'chart-container position-relative'
       container.style.minHeight = `${getChartLayout().minHeight}px`
+      if (getChartLayout().containerPadding) {
+        container.style.padding = getChartLayout().containerPadding
+      }
+      if (getChartLayout().containerHeight) {
+        container.style.height = getChartLayout().containerHeight
+      }
+      if (Number.isFinite(getChartLayout().containerMaxWidth)) {
+        container.style.maxWidth = `${getChartLayout().containerMaxWidth}px`
+        container.style.marginInline = 'auto'
+      }
 
       const canvas = document.createElement('canvas')
       canvas.style.minHeight = `${getChartLayout().minHeight}px`
       canvas.style.width = '100%'
+      canvas.style.maxWidth = '100%'
+      canvas.style.height = '100%'
       canvas.id = `performanceChart-${sanitizeScenarioKeyForId(scenarioKey)}-${direction}`
       container.appendChild(canvas)
 
@@ -1940,7 +1977,7 @@
       <tbody>
         ${rows.map(item => `
           <tr>
-            <td>${item.project ?? '-'}</td>
+            <td>${formatProjectLabel(item) ?? '-'}</td>
             <td>${formatNumber(item.throughputAvgMbps)}</td>
             <td>${formatBand(item.band) || item.band || '-'}</td>
             <td>${Number.isFinite(item.bandwidthMhz) ? `${item.bandwidthMhz} MHz` : '-'}</td>
@@ -2007,6 +2044,9 @@
         scales: {
           r: {
             beginAtZero: true,
+            grid: {
+              circular: true
+            },
             ticks: { display: true },
             pointLabels: {
               display: true,
@@ -2039,7 +2079,24 @@
       if (color.startsWith('rgb(')) return color.replace('rgb(', 'rgba(').replace(')', ', 0.15)')
       return color
     }
-    const angles = [0, 45, 90, 135, 180, 225, 270, 315, 360]
+    const angleSet = new Set()
+    groups.forEach(group => {
+      group.angles?.forEach?.((_, key) => {
+        const value = Number(key)
+        if (Number.isFinite(value)) angleSet.add(value)
+      })
+    })
+    const observedAngles = Array.from(angleSet.values()).sort((a, b) => a - b)
+    const pickStep = anglesList => {
+      if (anglesList.some(angle => Math.abs(angle % 30) < 1e-9)) return 30
+      if (anglesList.some(angle => Math.abs(angle % 45) < 1e-9)) return 45
+      if (anglesList.some(angle => Math.abs(angle % 15) < 1e-9)) return 15
+      return 45
+    }
+    const step = pickStep(observedAngles)
+    const angles = observedAngles.length > 0 && observedAngles.length < 6
+      ? Array.from({ length: Math.floor(360 / step) + 1 }, (_, idx) => idx * step)
+      : observedAngles
     const labels = angles.map(angle => `${formatNumber(angle, 0)}°`)
 
     const datasets = groups.map((group, index) => {
@@ -2067,14 +2124,15 @@
     chart.options.scales.r.pointLabels.color = coreui.Utils.getStyle('--cui-body-color')
     chart.update()
 
+    const hasAnyPoint = datasets.some(dataset => (dataset.data ?? []).some(value => Number.isFinite(value)))
     const emptyState = chartEmptyStates.get(scenarioKey)?.[direction]
     if (emptyState) {
-      emptyState.style.display = datasets.length === 0 ? 'block' : 'none'
+      emptyState.style.display = hasAnyPoint ? 'none' : 'block'
     }
 
     const record = scenarioSections.get(scenarioKey)
     if (record?.directionBlocks?.[direction]) {
-      record.directionBlocks[direction].hasData = datasets.length > 0
+      record.directionBlocks[direction].hasData = hasAnyPoint
       syncDirectionVisibilityForScenario(scenarioKey)
     }
   }

@@ -371,6 +371,8 @@ body.dashboard-page .sidebar .nav-group.show > .nav-link.is-section-active {
   background-color: transparent;
   background-image: none;
   overflow: hidden;
+  /* Some theme modes set form-select ink to white; force readable ink on light surfaces. */
+  color: var(--app-text) !important;
 }
 
 .multi-select__control::after {
@@ -457,6 +459,16 @@ body.dashboard-page .sidebar .nav-group.show > .nav-link.is-section-active {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* Never force white text on subtle/light badges. */
+  color: inherit !important;
+}
+
+.dashboard-page .multi-select__tag.badge.text-primary-emphasis {
+  color: var(--app-heading) !important;
+}
+
+.dashboard-page .multi-select__tag.badge.text-secondary {
+  color: var(--app-text-muted) !important;
 }
 
 .multi-select__dropdown {
