@@ -38,6 +38,20 @@
     }
   }
   const ORDERED_DIRECTIONS = ['uplink', 'downlink']
+  const CHART_LAYOUT = {
+    PEAK_THROUGHPUT: {
+      minHeight: 320,
+      emptyStateMaxWidth: 420
+    },
+    RVR: {
+      minHeight: 240,
+      emptyStateMaxWidth: 320
+    },
+    RVO: {
+      minHeight: 220,
+      emptyStateMaxWidth: 280
+    }
+  }
   const chartGroupsContainer = document.getElementById('performanceChartGroups')
   const dataTypeTabs = document.getElementById('performanceDataTypeTabs')
   const metricCards = document.getElementById('metricCards')
@@ -1209,6 +1223,8 @@
       }
     })
 
+  const getChartLayout = () => CHART_LAYOUT[selectedDataType] ?? CHART_LAYOUT.PEAK_THROUGHPUT
+
   const collectFilters = () => {
     const apiDataType = selectedDataType === 'PEAK_THROUGHPUT' ? 'performance' : selectedDataType
     const collected = {
@@ -1613,10 +1629,10 @@
 
       const container = document.createElement('div')
       container.className = 'chart-container position-relative'
-      container.style.minHeight = '320px'
+      container.style.minHeight = `${getChartLayout().minHeight}px`
 
       const canvas = document.createElement('canvas')
-      canvas.style.minHeight = '320px'
+      canvas.style.minHeight = `${getChartLayout().minHeight}px`
       canvas.style.width = '100%'
       canvas.id = `performanceChart-${sanitizeScenarioKeyForId(scenarioKey)}-${direction}`
       container.appendChild(canvas)
@@ -1624,6 +1640,11 @@
       const emptyState = document.createElement('div')
       emptyState.className = 'chart-empty-state fw-semibold position-absolute top-50 start-50 translate-middle text-center'
       emptyState.style.display = 'none'
+      emptyState.style.maxWidth = `${getChartLayout().emptyStateMaxWidth}px`
+      emptyState.style.width = 'calc(100% - 2rem)'
+      emptyState.style.padding = '0.85rem 1rem'
+      emptyState.style.fontSize = '0.95rem'
+      emptyState.style.lineHeight = '1.4'
       emptyState.textContent = `No data for ${DIRECTION_SETTINGS[direction].label}. Adjust the filters and try again.`
       container.appendChild(emptyState)
 
@@ -1631,9 +1652,11 @@
       section.appendChild(directionSection)
 
       directionBlocks[direction] = {
+        section: directionSection,
         headingElement: directionTitle,
         canvas,
-        emptyState
+        emptyState,
+        hasData: false
       }
     })
 
@@ -1773,6 +1796,27 @@
     return chart
   }
 
+  const syncDirectionVisibilityForScenario = scenarioKey => {
+    const record = scenarioSections.get(scenarioKey)
+    if (!record) return
+
+    const blocks = record.directionBlocks ?? {}
+    const hasDataByDirection = ORDERED_DIRECTIONS.map(direction => Boolean(blocks[direction]?.hasData))
+    const dataCount = hasDataByDirection.filter(Boolean).length
+
+    ORDERED_DIRECTIONS.forEach((direction, idx) => {
+      const section = blocks[direction]?.section
+      if (!section) return
+
+      if (dataCount === 1) {
+        section.style.display = hasDataByDirection[idx] ? '' : 'none'
+        return
+      }
+
+      section.style.display = ''
+    })
+  }
+
   const updateDirectionalChart = (scenarioKey, scenarioLabel, direction, groups) => {
     const chart = ensureDirectionalChart(scenarioKey, scenarioLabel, direction)
     if (!chart) {
@@ -1825,6 +1869,12 @@
     const emptyState = chartEmptyStates.get(scenarioKey)?.[direction]
     if (emptyState) {
       emptyState.style.display = datasets.length === 0 ? 'block' : 'none'
+    }
+
+    const record = scenarioSections.get(scenarioKey)
+    if (record?.directionBlocks?.[direction]) {
+      record.directionBlocks[direction].hasData = datasets.length > 0
+      syncDirectionVisibilityForScenario(scenarioKey)
     }
   }
 
@@ -2020,6 +2070,12 @@
     const emptyState = chartEmptyStates.get(scenarioKey)?.[direction]
     if (emptyState) {
       emptyState.style.display = datasets.length === 0 ? 'block' : 'none'
+    }
+
+    const record = scenarioSections.get(scenarioKey)
+    if (record?.directionBlocks?.[direction]) {
+      record.directionBlocks[direction].hasData = datasets.length > 0
+      syncDirectionVisibilityForScenario(scenarioKey)
     }
   }
 

@@ -127,12 +127,22 @@ const addConditionForValues = (conditions, params, column, values) => {
 }
 
 const addResolvedReportNameCondition = (conditions, params, values, tableAlias = 'tr') => {
-  return addConditionForValues(
-    conditions,
-    params,
-    `COALESCE(${tableAlias}.report_name, ${tableAlias}.csv_name, '')`,
-    values
-  )
+  const unique = uniqueValues(values ?? [])
+  if (unique.length === 0) {
+    return false
+  }
+
+  const perValueConditions = unique.map(() => `(
+    ${tableAlias}.report_name = ?
+    OR ${tableAlias}.csv_name = ?
+    OR COALESCE(${tableAlias}.report_name, ${tableAlias}.csv_name, '') = ?
+  )`)
+
+  conditions.push(`(${perValueConditions.join(' OR ')})`)
+  unique.forEach(value => {
+    params.push(value, value, value)
+  })
+  return true
 }
 
 export const normalizeFilters = query => {
