@@ -1,4 +1,4 @@
-/* global Chart, coreui, XLSX */
+/* global Chart, coreui, XLSX, jspdf */
 
 /**
  * Wi-Fi performance dashboard script
@@ -9,7 +9,18 @@
  */
 
 (() => {
-  const debug = (...args) => console.info('[wifi-dashboard]', ...args)
+  if (window.__wifiDashboardScriptLoaded) {
+    // In dev/hot-reload scenarios, the same script can be evaluated more than once.
+    // Avoid double-binding listeners which can cause repeated fetches and "flashing" UI.
+    return
+  }
+  window.__wifiDashboardScriptLoaded = true
+
+  const debugEnabled = new URLSearchParams(window.location.search).get('debug') === '1'
+  const debug = (...args) => {
+    if (!debugEnabled) return
+    console.info('[wifi-dashboard]', ...args)
+  }
   const warn = (...args) => console.warn('[wifi-dashboard]', ...args)
   const SIDEBAR_DATATYPE_KEY = 'wifi-dashboard-last-datatype'
   const DEFAULT_API_BASE = new URL('/api', window.location.origin).toString()
@@ -28,7 +39,9 @@
   const endDateInput = document.getElementById('filterEndDate')
   const statusMessage = document.getElementById('statusMessage')
   const refreshButton = document.getElementById('refreshButton')
-  const exportButton = document.getElementById('exportButton')
+  const exportDropdownToggle = document.getElementById('exportDropdownToggle')
+  const exportExcelButton = document.getElementById('exportExcelButton')
+  const exportPdfButton = document.getElementById('exportPdfButton')
   const DIRECTION_SETTINGS = {
     uplink: {
       label: 'Tx (Uplink)'
@@ -105,15 +118,18 @@
   }
 
   const syncSidebarDataTypeLinks = () => {
-    const sidebarLinks = document.querySelectorAll(".sidebar .nav-group-items .nav-link[href*='wifi-dashboard.html?datatype=']")
+    const sidebarLinks = document.querySelectorAll(".sidebar .nav-group-items .nav-link[data-wifi-dashboard-datatype], .sidebar .nav-group-items .nav-link[href*='wifi-dashboard.html']")
     let hasActiveChild = false
     sidebarLinks.forEach(link => {
-      let linkType = null
-      try {
-        const url = new URL(link.href, window.location.origin)
-        linkType = (url.searchParams.get('datatype') ?? url.searchParams.get('dataType') ?? '').toUpperCase()
-      } catch {
-        linkType = null
+      const datasetType = (link.dataset.wifiDashboardDatatype ?? '').toUpperCase()
+      let linkType = datasetType || null
+      if (!linkType) {
+        try {
+          const url = new URL(link.getAttribute('href') ?? '', window.location.origin)
+          linkType = (url.searchParams.get('datatype') ?? url.searchParams.get('dataType') ?? '').toUpperCase()
+        } catch {
+          linkType = null
+        }
       }
 
       const isActive = Boolean(linkType) && linkType === selectedDataType
@@ -126,7 +142,7 @@
       }
     })
 
-    const sectionLink = document.querySelector(".sidebar .nav-group.show > .nav-link[href='wifi-dashboard.html']")
+    const sectionLink = document.querySelector(".sidebar .nav-group.show > .wifi-db-label")
     if (sectionLink) {
       sectionLink.classList.toggle('active', hasActiveChild)
       sectionLink.classList.toggle('is-section-active', hasActiveChild)
@@ -140,11 +156,14 @@
     debug('syncSidebarDataTypeLinks', {
       selectedDataType,
       activeSection: hasActiveChild,
-      links: Array.from(sidebarLinks).map(link => ({
-        href: link.getAttribute('href'),
-        text: (link.textContent || '').trim(),
-        active: link.classList.contains('active')
-      }))
+      links: Array.from(sidebarLinks)
+        .map(link => ({
+          href: link.getAttribute('href'),
+          dataType: link.dataset.wifiDashboardDatatype ?? null,
+          text: (link.textContent || '').trim(),
+          active: link.classList.contains('active')
+        }))
+        .filter(item => Boolean(item.dataType) || (item.href ?? '').includes('datatype='))
     })
   }
 
@@ -286,6 +305,7 @@
 
   const loadWeeklyTests = () => {
     if (!metricCards) return
+    if (metricCards.classList.contains('d-none')) return
     if (window.WIFI_WEEKLY_TESTS) {
       renderWeeklyTestCards(window.WIFI_WEEKLY_TESTS)
       renderHeroStats(window.WIFI_WEEKLY_TESTS)
@@ -434,7 +454,11 @@
         this.applyFilter(this.searchInput.value)
       })
 
-      this.clearButton.addEventListener('click', () => {
+      this.clearButton.addEventListener('click', event => {
+        // Keep dropdown behavior self-contained; never let it bubble into the form.
+        // (Some browsers/plugins may treat nested button clicks as form interactions.)
+        event.preventDefault()
+        event.stopPropagation()
         if (this.disabled) {
           return
         }
@@ -444,7 +468,9 @@
       })
 
       if (this.showSelectAll) {
-        this.selectAllButton.addEventListener('click', () => {
+        this.selectAllButton.addEventListener('click', event => {
+          event.preventDefault()
+          event.stopPropagation()
           if (this.disabled || this.options.length === 0) {
             return
           }
@@ -1026,12 +1052,17 @@
     isLoading = nextState
     refreshButton.disabled = nextState
     if (nextState) {
-      exportButton.disabled = true
+      exportDropdownToggle && (exportDropdownToggle.disabled = true)
+      exportExcelButton && (exportExcelButton.disabled = true)
+      exportPdfButton && (exportPdfButton.disabled = true)
       if (message) {
         setStatus(message)
       }
     } else {
-      exportButton.disabled = exportButton.disabled || latestDataset.length === 0
+      const shouldDisable = latestDataset.length === 0
+      exportDropdownToggle && (exportDropdownToggle.disabled = shouldDisable)
+      exportExcelButton && (exportExcelButton.disabled = shouldDisable)
+      exportPdfButton && (exportPdfButton.disabled = shouldDisable)
     }
   }
 
@@ -2189,21 +2220,30 @@
         (scenario.directions[direction] ?? []).some(group => group.points.length > 0)
       )
     )
-    exportButton.disabled = !hasPoints
+    exportDropdownToggle && (exportDropdownToggle.disabled = !hasPoints)
+    exportExcelButton && (exportExcelButton.disabled = !hasPoints)
+    exportPdfButton && (exportPdfButton.disabled = !hasPoints)
   }
 
   const updateVisualization = data => {
     if (selectedDataType === 'PEAK_THROUGHPUT') {
       clearAllCharts()
       renderPeakTable(data)
-      exportButton.disabled = !(data && data.length > 0)
+      const enabled = Boolean(data && data.length > 0)
+      exportDropdownToggle && (exportDropdownToggle.disabled = !enabled)
+      exportExcelButton && (exportExcelButton.disabled = !enabled)
+      // Peak Throughput is currently rendered as a table (no chart canvas). Keep PDF disabled to avoid errors.
+      exportPdfButton && (exportPdfButton.disabled = true)
       return
     }
 
     if (selectedDataType === 'RVO') {
       clearAllCharts()
       updateRvoCharts(data)
-      exportButton.disabled = !(data && data.length > 0)
+      const enabled = Boolean(data && data.length > 0)
+      exportDropdownToggle && (exportDropdownToggle.disabled = !enabled)
+      exportExcelButton && (exportExcelButton.disabled = !enabled)
+      exportPdfButton && (exportPdfButton.disabled = !enabled)
       return
     }
 
@@ -2261,6 +2301,100 @@
     XLSX.writeFile(workbook, `wifi-performance-${timestamp}.xlsx`)
   }
 
+  const exportToPdf = () => {
+    const JsPdf = window.jspdf?.jsPDF
+    if (!JsPdf) {
+      throw new Error('PDF export is unavailable (jsPDF not loaded).')
+    }
+
+    const readCssVar = (name, fallback) => {
+      const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+      return value || fallback
+    }
+
+    const buildCanvasTitle = canvas => {
+      const directionTitle = canvas.closest('.chart-section')?.querySelector('h6')?.textContent?.trim() ?? ''
+      const scenarioTitle = canvas.closest('section')?.querySelector('h6')?.textContent?.trim() ?? ''
+      const parts = [scenarioTitle, directionTitle].filter(Boolean)
+      return parts.length > 0 ? parts.join(' - ') : 'Chart'
+    }
+
+    const renderCanvasForPdf = (canvas, { padding = 16 } = {}) => {
+      // Chart canvases are transparent. When exported to JPEG/PNG, transparent pixels may become black in viewers.
+      // Composite into a solid background that matches the dashboard surface.
+      const bg = readCssVar('--app-surface-alt', readCssVar('--cui-body-bg', '#ffffff'))
+      const composed = document.createElement('canvas')
+      composed.width = canvas.width + padding * 2
+      composed.height = canvas.height + padding * 2
+      const ctx = composed.getContext('2d')
+      if (!ctx) {
+        throw new Error('Failed to create PDF export canvas.')
+      }
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, composed.width, composed.height)
+      ctx.drawImage(canvas, padding, padding)
+      return composed
+    }
+
+    const canvases = Array.from(chartGroupsContainer?.querySelectorAll('canvas') ?? [])
+      .filter(canvas => canvas instanceof HTMLCanvasElement)
+      .filter(canvas => canvas.offsetParent !== null)
+      .filter(canvas => canvas.width > 0 && canvas.height > 0)
+
+    if (canvases.length === 0) {
+      throw new Error('No charts available for PDF export.')
+    }
+
+    const doc = new JsPdf({ orientation: 'landscape', unit: 'pt', format: 'a4', compress: true })
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+    const margin = 24
+    const slotGap = 14
+    const titleHeight = 36
+    const perPage = 2
+
+    const availableWidth = pageWidth - margin * 2
+    const availableHeight = pageHeight - margin * 2
+    const slotHeight = (availableHeight - slotGap) / 2
+
+    canvases.forEach((canvas, index) => {
+      const pageIndex = Math.floor(index / perPage)
+      const slotIndex = index % perPage
+      if (pageIndex > 0 && slotIndex === 0) {
+        doc.addPage()
+      }
+
+      const slotTop = margin + slotIndex * (slotHeight + slotGap)
+
+      const title = buildCanvasTitle(canvas)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(13)
+      doc.text(title, margin, slotTop + 16)
+
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.text(`Type: ${selectedDataType}`, margin, slotTop + 32)
+
+      const composed = renderCanvasForPdf(canvas, { padding: 18 })
+      const imgWidth = composed.width
+      const imgHeight = composed.height
+
+      const imgAvailableWidth = availableWidth
+      const imgAvailableHeight = slotHeight - titleHeight
+      const scale = Math.min(imgAvailableWidth / imgWidth, imgAvailableHeight / imgHeight)
+      const drawWidth = imgWidth * scale
+      const drawHeight = imgHeight * scale
+      const x = margin + (imgAvailableWidth - drawWidth) / 2
+      const y = slotTop + titleHeight
+
+      const dataUrl = composed.toDataURL('image/png')
+      doc.addImage(dataUrl, 'PNG', x, y, drawWidth, drawHeight)
+    })
+
+    const timestamp = new Date().toISOString().replace(/[:T]/g, '-').split('.')[0]
+    doc.save(`wifi-performance-${timestamp}.pdf`)
+  }
+
   const loadFiltersAndData = async ({ refreshFilters = true, refreshData = true, initial = false, statusMessage: pendingStatus } = {}) => {
     if (!refreshFilters && !refreshData) {
       return
@@ -2290,10 +2424,17 @@
       }
 
       if (refreshData) {
+        const selectedReports = testReportSelect ? getSelectedValues(testReportSelect) : []
+        if (testReportSelect && selectedReports.length === 0) {
+          latestDataset = []
+          updateVisualization([])
+          renderSelectedFiles([], { placeholder: 'Select test reports and apply the filters.' })
+          setStatus('Select at least one test report.')
+          return
+        }
         const { data, metadata } = await fetchPerformanceData()
         latestDataset = data
         updateVisualization(data)
-        const selectedReports = testReportSelect ? getSelectedValues(testReportSelect) : []
         const reportsToShow = data.length > 0
           ? (data ?? []).map(row => row.reportName ?? row.csvName).filter(Boolean)
           : selectedReports
@@ -2355,8 +2496,42 @@
     if (isSyncingFilters || isLoading) {
       return
     }
-
     loadFiltersAndData({ refreshFilters: true, refreshData: false })
+  }
+
+  const switchDataType = (value, { source = 'unknown' } = {}) => {
+    if (!value || value === selectedDataType) {
+      return
+    }
+
+    debug('datatype_switch', {
+      from: selectedDataType,
+      to: value,
+      source,
+      hrefBefore: window.location.href
+    })
+
+    selectedDataType = value
+    syncSelectedDataTypeToUrl()
+    syncSidebarDataTypeLinks()
+
+    // Clear current UI state before restoring the per-datatype state.
+    multiSelectControllers.forEach(controller => {
+      controller.clear(true)
+    })
+    if (startDateInput) startDateInput.value = ''
+    if (endDateInput) endDateInput.value = ''
+    restoredFilterState = loadFilterState()
+
+    if (dataTypeTabs) {
+      dataTypeTabs.querySelectorAll('[data-performance-datatype]').forEach(inner => {
+        const isActive = inner.dataset.performanceDatatype === selectedDataType
+        inner.classList.toggle('active', isActive)
+        inner.setAttribute('aria-selected', isActive ? 'true' : 'false')
+      })
+    }
+
+    loadFiltersAndData({ refreshFilters: true, refreshData: true })
   }
 
   const init = () => {
@@ -2394,10 +2569,24 @@
       }
       loadFiltersAndData({ refreshFilters: false, refreshData: true })
     })
-    exportButton.addEventListener('click', exportToExcel)
+    exportExcelButton?.addEventListener('click', () => {
+      try {
+        exportToExcel()
+      } catch (error) {
+        console.error(error)
+        window.alert(error?.message ?? 'Failed to export Excel.')
+      }
+    })
+    exportPdfButton?.addEventListener('click', () => {
+      try {
+        exportToPdf()
+      } catch (error) {
+        console.error(error)
+        window.alert(error?.message ?? 'Failed to export PDF.')
+      }
+    })
     productLineSelect.addEventListener('change', handleCriteriaChange)
     projectSelect.addEventListener('change', handleCriteriaChange)
-    testReportSelect?.addEventListener('change', handleCriteriaChange)
     standardSelect.addEventListener('change', handleCriteriaChange)
     startDateInput?.addEventListener('change', () => {
       saveFilterState()
@@ -2416,31 +2605,34 @@
         button.addEventListener('click', () => {
           const value = button.dataset.performanceDatatype
           if (!value) return
-          debug('datatype_tab_click', {
-            from: selectedDataType,
-            to: value,
-            hrefBefore: window.location.href
-          })
-          selectedDataType = value
-          syncSelectedDataTypeToUrl()
-          syncSidebarDataTypeLinks()
-          dataTypeTabs.querySelectorAll('[data-performance-datatype]').forEach(inner => {
-            const isActive = inner.dataset.performanceDatatype === selectedDataType
-            inner.classList.toggle('active', isActive)
-            inner.setAttribute('aria-selected', isActive ? 'true' : 'false')
-          })
-          const selectedReports = testReportSelect ? getSelectedValues(testReportSelect) : []
-          if (selectedReports.length === 0) {
-            setStatus('Select at least one test report.')
+          switchDataType(value, { source: 'tabs' })
+        })
+      })
+    }
+
+    const currentPath = (window.location.pathname || '').toLowerCase()
+    const isDashboardPage = currentPath.endsWith('/wifi-dashboard.html') || currentPath.endsWith('\\wifi-dashboard.html') || currentPath.endsWith('wifi-dashboard.html')
+    const sidebarRoot = document.getElementById('sidebar') ?? document.querySelector('.sidebar')
+    if (sidebarRoot) {
+      sidebarRoot.querySelectorAll('[data-wifi-dashboard-datatype]').forEach(button => {
+        if (!(button instanceof HTMLElement)) return
+        if (button.dataset.wifiDashboardBound === 'true') return
+        button.dataset.wifiDashboardBound = 'true'
+        button.addEventListener('click', () => {
+          const value = (button.dataset.wifiDashboardDatatype ?? '').toUpperCase()
+          if (!value || !DATA_TYPE_OPTIONS.some(option => option.value === value)) return
+          if (!isDashboardPage) {
+            window.location.href = `wifi-dashboard.html?datatype=${encodeURIComponent(value)}`
             return
           }
-          loadFiltersAndData({ refreshFilters: false, refreshData: true })
+          switchDataType(value, { source: 'sidebar' })
         })
       })
     }
 
     loadWeeklyTests()
-    loadFiltersAndData({ refreshFilters: true, refreshData: false, initial: true })
+    const hasStoredReports = Boolean(restoredFilterState?.reportNames?.length)
+    loadFiltersAndData({ refreshFilters: true, refreshData: hasStoredReports, initial: !hasStoredReports })
   }
 
   document.addEventListener('DOMContentLoaded', init)

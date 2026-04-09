@@ -78,7 +78,21 @@ if (shouldServeStatic) {
     res.redirect(302, `${requestedPath}.html${qs}`)
   })
 
-  app.use(express.static(staticDir))
+  // Dev ergonomics: avoid sticky browser caches for HTML/CSS/JS when serving the built dashboard.
+  // This fixes "Ctrl+F5 works but normal refresh shows old UI" issues.
+  app.use(express.static(staticDir, {
+    etag: false,
+    lastModified: false,
+    maxAge: 0,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-store')
+        return
+      }
+      // Still allow caching to be bypassed easily during dev; browsers will revalidate.
+      res.setHeader('Cache-Control', 'no-cache')
+    }
+  }))
 }
 
 app.use((err, req, res, next) => {

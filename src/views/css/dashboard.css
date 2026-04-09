@@ -1,4 +1,33 @@
 body.dashboard-page {
+  /* Wi-Fi dashboards use a light surface + Amlogic nav blue. Define the design tokens locally. */
+  --app-body-bg: #f6f0e6;
+  --app-surface: #fbf7f0;
+  --app-surface-alt: #f2eadf;
+  --app-nav-bg: #123c8f;
+  --app-sidebar-bg: #f6f0e6;
+  --app-sidebar-surface: #123c8f;
+  --app-sidebar-text: #1f2a3d;
+  --app-sidebar-muted: #5b667a;
+  --app-sidebar-hover: rgba(18, 60, 143, 0.08);
+  --app-sidebar-active: rgba(18, 60, 143, 0.14);
+
+  --app-text: #1f2a3d;
+  --app-heading: #0f1d36;
+  --app-text-muted: #5b667a;
+
+  --app-border: rgba(15, 29, 54, 0.14);
+  --app-border-strong: rgba(15, 29, 54, 0.24);
+  --app-shadow-soft: 0 18px 46px rgba(15, 29, 54, 0.12);
+
+  --app-brand: #123c8f;
+  --app-accent: #3c78d8;
+  --app-on-brand: #ffffff;
+
+  --app-success: #1b8f5a;
+  --app-warning: #c88400;
+  --app-danger: #c13a2f;
+  --app-chart-1: #123c8f;
+
   background: var(--app-body-bg);
   --dashboard-header-height: 88px;
 }
@@ -52,6 +81,33 @@ body.dashboard-page .sidebar,
 body.dashboard-page .sidebar-footer {
   background: var(--app-body-bg) !important;
   border: none !important;
+}
+
+/* Sidebar is rendered on a light surface for Wi-Fi dashboards, so force readable ink. */
+body.dashboard-page .sidebar .sidebar-nav {
+  /* Hard fallback color to avoid "blank sidebar" if CSS variables are not applied for any reason. */
+  color: var(--app-text, #1f2a3d);
+}
+
+body.dashboard-page .sidebar .sidebar-nav .nav-link,
+body.dashboard-page .sidebar .sidebar-nav .nav-link .nav-icon {
+  color: var(--app-text, #1f2a3d) !important;
+}
+
+body.dashboard-page .sidebar .sidebar-nav .nav-link:hover,
+body.dashboard-page .sidebar .sidebar-nav .nav-link:focus-visible {
+  color: var(--app-heading, #0f1d36) !important;
+}
+
+body.dashboard-page .sidebar .sidebar-nav .wifi-db-label {
+  color: var(--app-heading, #0f1d36) !important;
+  cursor: default;
+  user-select: none;
+}
+
+body.dashboard-page .sidebar .sidebar-nav button.nav-link {
+  width: 100%;
+  text-align: left;
 }
 
 body.dashboard-page .sidebar-header {
@@ -354,6 +410,29 @@ body.dashboard-page .sidebar .nav-group.show > .nav-link.is-section-active {
   border-radius: 1rem;
   border: 1px dashed var(--app-border-strong);
   padding: 1.5rem;
+}
+
+.wifi-only-nav .sidebar-nav > :not(.wifi-only) {
+  display: none;
+}
+
+.wifi-only-nav .sidebar-nav .nav-divider,
+.wifi-only-nav .sidebar-nav .nav-title {
+  display: none;
+}
+
+/* Hard guarantee: the Wi-Fi-only nav group must stay visible and expanded (mobile + desktop). */
+.wifi-only-nav .sidebar-nav > .wifi-only {
+  display: block !important;
+}
+
+.wifi-only-nav .sidebar-nav > .wifi-only > .nav-group-items {
+  display: block !important;
+  height: auto !important;
+  max-height: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  overflow: visible !important;
 }
 
 .multi-select {

@@ -44,7 +44,7 @@
     <!-- We use those styles to show code examples, you should remove them in your application.-->
     <link href="css/examples.css" rel="stylesheet">
     <link rel="stylesheet" href="node_modules/@coreui/chartjs/dist/css/coreui-chartjs.css">
-    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/dashboard.css?v=20260409">
   </head>
   <body class="dashboard-page">
     <div class="sidebar sidebar-fixed border-end" id="sidebar">
@@ -56,7 +56,8 @@
         <button class="btn-close d-lg-none" type="button" data-coreui-theme="dark" aria-label="Close" onclick="coreui.Sidebar.getInstance(document.querySelector(&quot;#sidebar&quot;)).toggle()"></button>
       </div>
       <ul class="sidebar-nav" data-coreui="navigation" data-simplebar>
-        <li class="nav-group show"><a class="nav-link" href="wifi-dashboard.html">
+        <li class="nav-group show">
+          <a class="nav-link" href="wifi-dashboard.html">
             <svg class="nav-icon">
               <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-wifi-signal-4"></use>
           </svg> Wi-Fi Database</a>
@@ -398,11 +399,23 @@
                         <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-reload"></use>
                       </svg>Refresh
                     </button>
-                    <button class="btn btn-outline-primary btn-sm" id="exportButton" type="button">
-                      <svg class="icon me-1">
-                        <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-cloud-download"></use>
-                      </svg>Export
-                    </button>
+                    <div class="btn-group">
+                      <button
+                        class="btn btn-outline-primary btn-sm dropdown-toggle"
+                        id="exportDropdownToggle"
+                        type="button"
+                        data-coreui-toggle="dropdown"
+                        aria-expanded="false"
+                      >
+                        <svg class="icon me-1">
+                          <use xlink:href="node_modules/@coreui/icons/sprites/free.svg#cil-cloud-download"></use>
+                        </svg>Export
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="exportDropdownToggle">
+                        <li><button class="dropdown-item" id="exportExcelButton" type="button">Excel (.xlsx)</button></li>
+                        <li><button class="dropdown-item" id="exportPdfButton" type="button">PDF</button></li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
                 <div class="card-body d-flex align-items-center justify-content-center">
@@ -435,7 +448,8 @@
     <script src="node_modules/@coreui/chartjs/dist/js/coreui-chartjs.js"></script>
     <script src="node_modules/@coreui/utils/dist/umd/index.js"></script>
     <script src="node_modules/xlsx/dist/xlsx.full.min.js"></script>
-    <script src="js/wifi-dashboard.js"></script>
+    <script src="node_modules/jspdf/dist/jspdf.umd.min.js"></script>
+    <script src="js/wifi-dashboard.js?v=20260409"></script>
     <script> 
     </script>
   </body>
