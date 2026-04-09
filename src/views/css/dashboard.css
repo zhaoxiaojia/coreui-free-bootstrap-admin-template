@@ -150,6 +150,14 @@ body.dashboard-page .sidebar .nav-group-items .nav-link[aria-current='page'] {
   border-radius: 0.85rem;
 }
 
+body.wifi-sidebar-trimmed #sidebar .sidebar-nav > :not(:first-child) {
+  display: none !important;
+}
+
+body.wifi-sidebar-trimmed #sidebar .sidebar-nav > .nav-group:first-child > .nav-group-items > .nav-item:nth-child(n + 4) {
+  display: none !important;
+}
+
 body.dashboard-page .sidebar .nav-group.show > .nav-link.is-section-active {
   background: linear-gradient(135deg, color-mix(in srgb, var(--app-brand) 22%, transparent), color-mix(in srgb, var(--app-accent) 22%, transparent)) !important;
   color: var(--app-heading) !important;
